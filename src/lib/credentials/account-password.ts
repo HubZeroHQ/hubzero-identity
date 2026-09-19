@@ -84,6 +84,7 @@ export class AccountPasswordService {
         previousSecretValidUntil: null,
         secretHashVersion: 1,
         sessionVersion: account.sessionVersion,
+        authenticatedAt: now,
         createdAt: now,
         lastSeenAt: now,
         idleExpiresAt,

@@ -7,7 +7,7 @@ import styles from "@/app/sign-in/sign-in.module.css";
 
 const initialState: PasswordActionState = {};
 
-export function PasswordChangeForm({ forced }: { forced: boolean }) {
+export function PasswordChangeForm({ forced, returnTo }: { forced: boolean; returnTo?: string }) {
   const [state, action, pending] = useActionState(changePasswordAction, initialState);
   const message = state.error === "current" ? "Your current password is incorrect."
     : state.error === "confirmation" ? "The new password and confirmation do not match."
@@ -15,6 +15,7 @@ export function PasswordChangeForm({ forced }: { forced: boolean }) {
         : state.error === "unavailable" ? "Your password could not be changed right now. Try again shortly."
           : null;
   return <form action={action} className={styles.form} aria-describedby={message ? "password-status" : undefined}>
+    <input type="hidden" name="returnTo" value={returnTo ?? "/"} />
     <PasswordField name="currentPassword" label="Current password" autoComplete="current-password" />
     <PasswordField name="newPassword" label="New password" autoComplete="new-password" describedBy="password-guidance" />
     <PasswordField name="confirmation" label="Confirm new password" autoComplete="new-password" />

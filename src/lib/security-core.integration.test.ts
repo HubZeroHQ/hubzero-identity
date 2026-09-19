@@ -83,7 +83,7 @@ describe("identity security core with MongoDB", () => {
     const now = clock.now();
     await identityApplicationsCollection(database).insertOne({
       _id: new ObjectId(), id: applicationId, slug: "studio", displayName: "HubZero Studio", description: "CMS",
-      clientId: "studio-test", clientType: "confidential_web", visibility: "internal", redirectUris: ["http://localhost/callback"],
+      clientId: "studio-test", clientType: "confidential_web", clientSecretReference: "test-studio", visibility: "internal", redirectUris: ["http://localhost/callback"],
       postLogoutRedirectUris: ["http://localhost"], firstParty: true, enabled: true, brand: { homeUrl: "http://localhost" }, createdAt: now, updatedAt: now,
     });
     const account = await provisioning.provision({ ...provisionInput("member@example.com", "request-key-00000020"), applicationIds: [applicationId] });
@@ -97,7 +97,7 @@ describe("identity security core with MongoDB", () => {
     const now = clock.now();
     await identityApplicationsCollection(database).insertOne({
       _id: new ObjectId(), id: disabledId, slug: "fitness", displayName: "HubZero Fitness", description: "Fitness",
-      clientId: "fitness-test", clientType: "confidential_web", visibility: "private", redirectUris: ["http://localhost/callback"],
+      clientId: "fitness-test", clientType: "confidential_web", clientSecretReference: "test-fitness", visibility: "private", redirectUris: ["http://localhost/callback"],
       postLogoutRedirectUris: ["http://localhost"], firstParty: true, enabled: false, brand: { homeUrl: "http://localhost" }, createdAt: now, updatedAt: now,
     });
     await expect(provisioning.provision({ ...provisionInput("denied@example.com", "request-key-00000021"), applicationIds: [disabledId] })).rejects.toThrow(ProvisioningConflictError);

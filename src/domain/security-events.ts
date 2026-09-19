@@ -22,6 +22,9 @@ export const securityEventTypes = [
   "admin.operation",
   "provisioning.conflict",
   "rate_limit.triggered",
+  "oidc.authorization_succeeded",
+  "oidc.authorization_denied",
+  "oidc.reauthentication",
 ] as const;
 
 export type SecurityEventType = (typeof securityEventTypes)[number];
@@ -61,6 +64,9 @@ export type SecurityEventMetadataByType = {
   "admin.operation": { operation: string; reason: string };
   "provisioning.conflict": { reason: string };
   "rate_limit.triggered": { namespace: string; retryAfterSeconds: number };
+  "oidc.authorization_succeeded": { clientId: string; prompt: string };
+  "oidc.authorization_denied": { clientId: string; reason: string };
+  "oidc.reauthentication": { clientId: string };
 };
 
 const forbiddenMetadataKeys = new Set([
@@ -100,6 +106,9 @@ const allowedMetadataKeys: Record<SecurityEventType, readonly string[]> = {
   "admin.operation": ["operation", "reason"],
   "provisioning.conflict": ["reason"],
   "rate_limit.triggered": ["namespace", "retryAfterSeconds"],
+  "oidc.authorization_succeeded": ["clientId", "prompt"],
+  "oidc.authorization_denied": ["clientId", "reason"],
+  "oidc.reauthentication": ["clientId"],
 };
 
 export function assertSafeEventMetadata(

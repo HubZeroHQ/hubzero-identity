@@ -12,6 +12,8 @@ export interface IdentityApplication {
   description: string;
   clientId: string;
   clientType: ClientType;
+  /** Logical secret-manager reference; the client secret is never stored here. */
+  clientSecretReference: string | null;
   visibility: ApplicationVisibility;
   redirectUris: readonly string[];
   postLogoutRedirectUris: readonly string[];

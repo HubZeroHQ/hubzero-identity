@@ -42,8 +42,8 @@ describe("HubZero Account browser lifecycle", () => {
     actorSubject = generateIdentitySubject();
     const now = new Date();
     await identityApplicationsCollection(database).insertMany([
-      { _id: new ObjectId(), id: "studio" as never, slug: "studio", displayName: "HubZero Studio", description: "Development Studio", clientId: "studio-e2e", clientType: "confidential_web", visibility: "internal", redirectUris: ["http://localhost/callback"], postLogoutRedirectUris: ["http://localhost"], firstParty: true, enabled: true, brand: { homeUrl: "hubzero.in", mark: "S" }, createdAt: now, updatedAt: now },
-      { _id: new ObjectId(), id: "fitness" as never, slug: "fitness", displayName: "HubZero Fitness", description: "Development Fitness", clientId: "fitness-e2e", clientType: "confidential_web", visibility: "private", redirectUris: ["http://localhost/callback"], postLogoutRedirectUris: ["http://localhost"], firstParty: true, enabled: true, brand: { homeUrl: "fitness.hubzero.in", mark: "F" }, createdAt: now, updatedAt: now },
+      { _id: new ObjectId(), id: "studio" as never, slug: "studio", displayName: "HubZero Studio", description: "Development Studio", clientId: "studio-e2e", clientType: "confidential_web", clientSecretReference: "e2e-studio", visibility: "internal", redirectUris: ["http://localhost/callback"], postLogoutRedirectUris: ["http://localhost"], firstParty: true, enabled: true, brand: { homeUrl: "hubzero.in", mark: "S" }, createdAt: now, updatedAt: now },
+      { _id: new ObjectId(), id: "fitness" as never, slug: "fitness", displayName: "HubZero Fitness", description: "Development Fitness", clientId: "fitness-e2e", clientType: "confidential_web", clientSecretReference: "e2e-fitness", visibility: "private", redirectUris: ["http://localhost/callback"], postLogoutRedirectUris: ["http://localhost"], firstParty: true, enabled: true, brand: { homeUrl: "fitness.hubzero.in", mark: "F" }, createdAt: now, updatedAt: now },
     ]);
     const events = new MongoSecurityEventWriter(database);
     const passwords = PasswordService.create();

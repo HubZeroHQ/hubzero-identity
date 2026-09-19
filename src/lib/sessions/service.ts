@@ -26,6 +26,8 @@ export interface CreateSessionInput {
   identitySubject: IdentitySubject;
   userAgentSummary?: string | null;
   ipPrefix?: string | null;
+  /** Preserve the original credential-proof time when replacing a session. */
+  authenticatedAt?: Date;
 }
 
 export interface SessionAuditEvent {
@@ -38,6 +40,7 @@ export interface CreatedSession {
   token: string;
   idleExpiresAt: Date;
   absoluteExpiresAt: Date;
+  authenticatedAt: Date;
 }
 
 export interface ValidatedSession {
@@ -47,6 +50,7 @@ export interface ValidatedSession {
   idleExpiresAt: Date;
   absoluteExpiresAt: Date;
   needsRotation: boolean;
+  authenticatedAt: Date;
 }
 
 export interface SessionValidationOptions {
@@ -70,6 +74,7 @@ export class SessionService {
     const material = createSessionSecret(sessionId);
     const idleExpiresAt = addSeconds(now, sessionPolicy.idleLifetimeSeconds);
     const absoluteExpiresAt = addSeconds(now, sessionPolicy.absoluteLifetimeSeconds);
+    const authenticatedAt = input.authenticatedAt ?? now;
 
     await withRequiredTransaction(this.client, async (session) => {
       const account = await identityUsersCollection(this.database).findOne({ subject: input.identitySubject, status: "active" }, { session });
@@ -83,6 +88,7 @@ export class SessionService {
         previousSecretValidUntil: null,
         secretHashVersion: 1,
         sessionVersion: account.sessionVersion,
+        authenticatedAt,
         createdAt: now,
         lastSeenAt: now,
         idleExpiresAt,
@@ -99,7 +105,7 @@ export class SessionService {
       }
       return true;
     });
-    return { sessionId, token: material.token, idleExpiresAt, absoluteExpiresAt };
+    return { sessionId, token: material.token, idleExpiresAt, absoluteExpiresAt, authenticatedAt };
   }
 
   async validate(token: string, options: SessionValidationOptions = {}): Promise<ValidatedSession | null> {
@@ -148,7 +154,7 @@ export class SessionService {
         return true;
       });
       if (rotated) {
-        return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: nextMaterial.token, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation: false };
+        return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: nextMaterial.token, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation: false, authenticatedAt: record.authenticatedAt };
       }
       record = await sessions.findOne({ _id: record._id });
       if (!record || record.revokedAt || !record.previousSecretHash || !record.previousSecretValidUntil || record.previousSecretValidUntil <= now || !constantTimeEqual(suppliedHash, record.previousSecretHash)) return null;
@@ -156,7 +162,7 @@ export class SessionService {
 
     const shouldTouch = now.getTime() - record.lastSeenAt.getTime() >= sessionPolicy.activityUpdateAfterSeconds * 1000;
     if (!shouldTouch) {
-      return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: record.idleExpiresAt, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation };
+      return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: record.idleExpiresAt, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation, authenticatedAt: record.authenticatedAt };
     }
     const touch = await sessions.updateOne({
       _id: record._id,
@@ -170,7 +176,7 @@ export class SessionService {
       ],
     }, { $set: { lastSeenAt: now, idleExpiresAt: nextIdleExpiry } });
     if (touch.matchedCount !== 1) return null;
-    return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation };
+    return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation, authenticatedAt: record.authenticatedAt };
   }
 
   async revoke(sessionId: string, actorSubject: IdentitySubject, reason: string): Promise<boolean> {
@@ -234,6 +240,7 @@ export class SessionService {
     const material = createSessionSecret(sessionId);
     const idleExpiresAt = addSeconds(now, sessionPolicy.idleLifetimeSeconds);
     const absoluteExpiresAt = addSeconds(now, sessionPolicy.absoluteLifetimeSeconds);
+    const authenticatedAt = input.authenticatedAt ?? now;
     return withRequiredTransaction(this.client, async (session) => {
       const account = await identityUsersCollection(this.database).findOneAndUpdate({ subject: input.identitySubject, status: "active" }, {
         $inc: { sessionVersion: 1 },
@@ -252,6 +259,7 @@ export class SessionService {
         previousSecretValidUntil: null,
         secretHashVersion: 1,
         sessionVersion: account.sessionVersion,
+        authenticatedAt,
         createdAt: now,
         lastSeenAt: now,
         idleExpiresAt,
@@ -264,7 +272,7 @@ export class SessionService {
       }, { session });
       await this.events.append("session.other_sessions_revoked", { reason, revokedCount: revoked.modifiedCount }, { actorSubject: input.identitySubject, targetSubject: input.identitySubject }, session);
       await this.events.append("session.created", { sessionId }, { targetSubject: input.identitySubject }, session);
-      return { sessionId, token: material.token, idleExpiresAt, absoluteExpiresAt, revokedCount: revoked.modifiedCount };
+      return { sessionId, token: material.token, idleExpiresAt, absoluteExpiresAt, authenticatedAt, revokedCount: revoked.modifiedCount };
     });
   }
 }

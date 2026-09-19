@@ -49,6 +49,29 @@ export const identityIndexManifest: readonly CollectionIndexManifest[] = [
     { key: { familyId: 1 }, name: "refresh_token_family" },
     { key: { expiresAt: 1 }, name: "expire_refresh_tokens", expireAfterSeconds: 0 },
   ] },
+  { collection: "oidc_authorizationcode_artifacts", indexes: [
+    { key: { expiresAt: 1 }, name: "expire_artifacts", expireAfterSeconds: 0 },
+    { key: { grantLookup: 1 }, name: "by_grant", sparse: true },
+  ] },
+  { collection: "oidc_accesstoken_artifacts", indexes: [
+    { key: { expiresAt: 1 }, name: "expire_artifacts", expireAfterSeconds: 0 },
+    { key: { grantLookup: 1 }, name: "by_grant", sparse: true },
+  ] },
+  { collection: "oidc_grant_artifacts", indexes: [
+    { key: { expiresAt: 1 }, name: "expire_artifacts", expireAfterSeconds: 0 },
+  ] },
+  { collection: "oidc_interaction_artifacts", indexes: [
+    { key: { expiresAt: 1 }, name: "expire_artifacts", expireAfterSeconds: 0 },
+    { key: { uidLookup: 1 }, name: "by_uid", unique: true, sparse: true },
+  ] },
+  { collection: "oidc_session_artifacts", indexes: [
+    { key: { expiresAt: 1 }, name: "expire_artifacts", expireAfterSeconds: 0 },
+    { key: { uidLookup: 1 }, name: "by_uid", unique: true, sparse: true },
+  ] },
+  { collection: "oidc_interaction_continuations", indexes: [
+    { key: { expiresAt: 1 }, name: "expire_continuations", expireAfterSeconds: 0 },
+    { key: { interactionUid: 1 }, name: "by_interaction_uid" },
+  ] },
 ] as const;
 
 export interface IndexMigrationPlan {

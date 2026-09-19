@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const optionalSecret = z.string().min(1).optional();
+const booleanFlag = z.enum(["true", "false"]).optional().transform((value) => value === "true");
 
 export const environmentSchema = z
   .object({
@@ -14,6 +15,10 @@ export const environmentSchema = z
     EMAIL_FROM: z.string().email().optional(),
     EMAIL_PROVIDER_API_KEY: optionalSecret,
     OIDC_SIGNING_KEYSET_JSON: optionalSecret,
+    OIDC_PROVIDER_ENABLED: booleanFlag,
+    OIDC_ADAPTER_HMAC_KEY_BASE64: optionalSecret,
+    /** JSON object mapping an Identity-owned secret reference to a client secret. */
+    OIDC_CLIENT_SECRETS_JSON: optionalSecret,
   })
   .transform((environment, context) => {
     let uriDatabase: string | null = null;
@@ -39,10 +44,18 @@ export const environmentSchema = z
     if (!environment.IDENTITY_ISSUER_URL.startsWith("https://")) {
       context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must use HTTPS" });
     }
-    for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64", "OIDC_SIGNING_KEYSET_JSON"] as const) {
+    for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64"] as const) {
       if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required in production` });
     }
-    for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64"] as const) {
+    if (environment.IDENTITY_ISSUER_URL !== "https://auth.hubzero.in") {
+      context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must be https://auth.hubzero.in" });
+    }
+    if (environment.OIDC_PROVIDER_ENABLED) {
+      for (const name of ["OIDC_SIGNING_KEYSET_JSON", "OIDC_ADAPTER_HMAC_KEY_BASE64", "OIDC_CLIENT_SECRETS_JSON"] as const) {
+        if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required when the OIDC provider is enabled` });
+      }
+    }
+    for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64", "OIDC_ADAPTER_HMAC_KEY_BASE64"] as const) {
       const value = environment[name];
       if (value && Buffer.from(value, "base64").byteLength < 32) {
         context.addIssue({ code: "custom", path: [name], message: `${name} must decode to at least 32 bytes` });

@@ -61,7 +61,7 @@ export async function authenticateWithPasswordUsingRuntime(runtime: IdentityRunt
     });
     return {
       outcome: "authenticated",
-      identity: { user: account, sessionId: created.sessionId, needsRotation: false },
+      identity: { user: account, sessionId: created.sessionId, needsRotation: false, authenticatedAt: created.authenticatedAt },
       token: created.token,
       absoluteExpiresAt: created.absoluteExpiresAt,
     };

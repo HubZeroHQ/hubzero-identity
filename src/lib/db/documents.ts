@@ -47,6 +47,7 @@ export interface IdentitySessionDocument {
   previousSecretValidUntil: Date | null;
   secretHashVersion: number;
   sessionVersion: number;
+  authenticatedAt: Date;
   createdAt: Date;
   lastSeenAt: Date;
   idleExpiresAt: Date;
@@ -75,6 +76,7 @@ export interface ApplicationDocument {
   description: string;
   clientId: string;
   clientType: ClientType;
+  clientSecretReference: string | null;
   visibility: ApplicationVisibility;
   redirectUris: string[];
   postLogoutRedirectUris: string[];
@@ -108,4 +110,25 @@ export interface RateLimitDocument {
   expiresAt: Date;
   lastTriggeredAt?: Date | null;
   updatedAt: Date;
+}
+
+/** Provider-owned persistence. It is intentionally separate from canonical Identity records. */
+export interface OidcArtifactDocument {
+  _id: string;
+  model: string;
+  payload: Record<string, unknown>;
+  expiresAt: Date | null;
+  consumedAt: Date | null;
+  uidLookup: string | null;
+  userCodeLookup: string | null;
+  grantLookup: string | null;
+}
+
+/** Opaque bridge between provider-native interactions and the Next.js interaction UI. */
+export interface OidcInteractionContinuationDocument {
+  _id: string;
+  interactionUid: string;
+  clientId: string;
+  expiresAt: Date;
+  createdAt: Date;
 }

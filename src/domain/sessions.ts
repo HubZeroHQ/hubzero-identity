@@ -8,6 +8,8 @@ export interface IdentitySession {
   previousSecretValidUntil: Date | null;
   secretHashVersion: number;
   sessionVersion: number;
+  /** Time at which the password proof that established this session completed. */
+  authenticatedAt: Date;
   createdAt: Date;
   lastSeenAt: Date;
   idleExpiresAt: Date;

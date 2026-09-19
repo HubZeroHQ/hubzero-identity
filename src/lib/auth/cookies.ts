@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { Environment } from "@/lib/env";
 import { sessionPolicy } from "@/domain/sessions";
 

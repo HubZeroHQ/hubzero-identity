@@ -1,5 +1,3 @@
-import "server-only";
-
 import { CredentialService } from "@/lib/credentials/service";
 import { PasswordService } from "@/lib/credentials/password";
 import { getIdentityDatabaseConnection } from "@/lib/db/mongodb";
@@ -21,8 +19,7 @@ export interface IdentityRuntime {
   events: MongoSecurityEventWriter;
 }
 
-export async function getIdentityRuntime(): Promise<IdentityRuntime> {
-  const environment = parseEnvironment(process.env);
+export async function createIdentityRuntime(environment: Environment): Promise<IdentityRuntime> {
   const { client, database } = await getIdentityDatabaseConnection(environment);
   const events = new MongoSecurityEventWriter(database);
   const passwords = PasswordService.create();
@@ -36,4 +33,8 @@ export async function getIdentityRuntime(): Promise<IdentityRuntime> {
     sessions: new SessionService(database, client, decodeRequiredBase64Key(environment.SESSION_HMAC_KEY_BASE64!, "SESSION_HMAC_KEY_BASE64"), events),
     rateLimiter: new MongoFixedWindowRateLimiter(database, decodeRequiredBase64Key(environment.RATE_LIMIT_HMAC_KEY_BASE64!, "RATE_LIMIT_HMAC_KEY_BASE64"), events),
   };
+}
+
+export async function getIdentityRuntime(): Promise<IdentityRuntime> {
+  return createIdentityRuntime(parseEnvironment(process.env));
 }

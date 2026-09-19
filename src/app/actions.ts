@@ -15,6 +15,7 @@ import { summarizeUserAgent, trustedIpPrefix } from "@/lib/auth/request-metadata
 import { getCurrentIdentity, requireCurrentIdentity, requireFullAccountIdentity } from "@/lib/auth/session-context";
 import { getIdentityRuntime } from "@/lib/auth/runtime";
 import { decodeRequiredBase64Key } from "@/lib/security/crypto";
+import { oidcProviderSessionCookieName } from "@/lib/oidc/interaction-continuation";
 
 export interface SignInActionState {
   error?: "invalid" | "rate_limited" | "unavailable" | "suspended";
@@ -42,8 +43,9 @@ export async function signInAction(_: SignInActionState, formData: FormData): Pr
   }
   const cookieStore = await cookies();
   cookieStore.set(sessionCookieName(runtime.environment), result.token, sessionCookieOptions(runtime.environment, result.absoluteExpiresAt));
+  cookieStore.set(oidcProviderSessionCookieName(runtime.environment.APP_ENV), "", sessionCookieOptions(runtime.environment));
   const credentials = await identityCredentialsCollection(runtime.database).findOne({ identitySubject: result.identity.user.subject, type: "password" }, { projection: { mustChangePassword: 1 } });
-  redirect((credentials?.mustChangePassword ? "/change-password?forced=1" : returnTo) as Route);
+  redirect((credentials?.mustChangePassword ? `/change-password?forced=1&returnTo=${encodeURIComponent(returnTo)}` : returnTo) as Route);
 }
 
 export async function signOutAction(): Promise<void> {
@@ -63,6 +65,7 @@ export async function changePasswordAction(_: PasswordActionState, formData: For
   const runtime = await getIdentityRuntime();
   const requestHeaders = await headers();
   try { assertTrustedMutationOrigin(requestHeaders.get("origin"), runtime.environment); } catch { return { error: "unavailable", attempt: Date.now() }; }
+  const returnTo = safeReturnPath(formValue(formData, "returnTo", 2_000));
   const identity = await requireCurrentIdentity("/change-password");
   const currentPassword = formValue(formData, "currentPassword", 4_096);
   const newPassword = formValue(formData, "newPassword", 4_096);
@@ -81,6 +84,7 @@ export async function changePasswordAction(_: PasswordActionState, formData: For
       ipPrefix: trustedIpPrefix(requestHeaders.get("x-forwarded-for"), runtime.environment),
     });
     (await cookies()).set(sessionCookieName(runtime.environment), result.token, sessionCookieOptions(runtime.environment, result.absoluteExpiresAt));
+    (await cookies()).set(oidcProviderSessionCookieName(runtime.environment.APP_ENV), "", sessionCookieOptions(runtime.environment));
   } catch (error) {
     if (error instanceof CurrentPasswordRejectedError) return { error: "current", attempt: Date.now() };
     if (error instanceof PasswordPolicyError) return { error: "policy", message: error.message, attempt: Date.now() };
@@ -88,7 +92,7 @@ export async function changePasswordAction(_: PasswordActionState, formData: For
     return { error: "unavailable", attempt: Date.now() };
   }
   revalidatePath("/");
-  redirect("/?notice=password-changed");
+  redirect((returnTo === "/" ? "/?notice=password-changed" : returnTo) as Route);
 }
 
 export interface ProfileActionState { error?: string; success?: boolean; attempt?: number }
