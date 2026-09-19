@@ -6,6 +6,8 @@ Unit tests cover password validation/verification adapters, bcrypt-to-Argon2id m
 
 Integration tests use an isolated MongoDB and real provider adapter. They cover login/logout, fixation prevention, revoked/expired session, suspension, password-change invalidation, application disabled state, membership allow/deny, code exchange, redirect mismatch, wrong PKCE verifier, expired/reused code, refresh rotation/reuse, and concurrent single-use attempts.
 
+Phase 2 integration tests launch a uniquely named, digest-pinned MongoDB 8 Docker container as a single-node replica set, publish a random loopback-only port, and remove only that container in teardown. This reproduces transaction semantics without production/shared databases or a vulnerable harness dependency. `npm run test:integration` fails clearly when Docker is unavailable. Updating the image digest is a reviewed dependency change. Later provider scenarios remain Phase 4.
+
 End-to-end tests eventually run two small relying-party fixtures:
 
 - Studio → Identity → callback → current Studio membership/role → allow or authorization denial.

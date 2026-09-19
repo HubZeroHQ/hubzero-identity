@@ -2,9 +2,11 @@
 
 ## V1 provisioning
 
-Use a reviewed, audited CLI and dedicated migration command, run by an authorized operator with a short-lived privileged database credential. This is the smallest safe mechanism for five accounts and avoids shipping a premature IAM console.
+Use `npm run account:provision -- ... --password-stdin`, run by an authorized operator with a short-lived privileged database credential. The CLI requires name, email, actor subject, reason, and a 16+ character idempotency key; memberships are optional application IDs. Initial credentials default to `mustChangePassword=true`. It supports `--dry-run` and `--json`. It never accepts a password argument: stdin must come from an approved protected secret source, and the CLI refuses visible TTY entry.
 
-Commands will support dry-run, idempotency key, explicit operator subject, structured redacted result, and transaction-backed creation. Initial passwords are never command-line arguments or logged. Legacy migration accepts hashes only from a controlled export channel. Every provision, membership change, suspension, recovery, and session revocation writes a security event.
+Creation is transaction-backed and requires deployed indexes. The idempotency key is SHA-256 hashed before storage. A replay returns the same subject only when identity input and current active memberships remain compatible; it never changes the password, subject, status, or memberships. The output says whether creation occurred and contains only subject, canonical display email, and memberships. A different password on replay is intentionally ignored because replay never overwrites credentials. Canonical-email or incompatible-key conflicts fail and are audited.
+
+The CLI's database credential authorizes execution; `--actor-subject` is mandatory attribution, not an authentication mechanism. Until a dedicated operator authentication path exists, runbook review must verify that attribution. Legacy migration accepts hashes only from a controlled export channel and remains Phase 6.
 
 The account UI is self-service only. A narrow admin UI is deferred until operational frequency justifies it. When added, it requires explicit admin capability independent of `internal`, server-side checks, recent re-authentication for sensitive changes, and audited actor/target records.
 

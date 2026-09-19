@@ -21,6 +21,8 @@
 
 Use a shared atomic store in multi-instance environments. Separate buckets apply to login account key, IP prefix, recovery account key, token endpoint client/IP, and administrative mutations. Responses are generic and use `Retry-After` where appropriate. Successful login resets only the account-specific failure progression after an event is recorded. Limits and thresholds are deployment configuration with conservative defaults; production cannot start with the limiter disabled. A CAPTCHA is not a v1 default.
 
+Phase 2 uses MongoDB fixed-window buckets. Raw identifiers are converted to namespace-separated HMAC-SHA-256 bucket IDs; only the namespace is readable. An atomic update caps count at `limit + 1`, returns retry-after, and prevents lost updates. TTL removes expired buckets but the update checks expiry itself. Callers must choose `fail_closed` (authentication, credential, recovery and protocol abuse) or a documented `fail_open` policy for non-security availability controls. MongoDB is sufficient for current private scale; replace the narrow `RateLimiter` interface with Redis or another atomic store if write load or latency demonstrates a need.
+
 ## Logging and observability
 
 Application logs are structured and carry timestamp, level, event name, request ID, route template, status, latency, environment, and coarse error code. Metrics cover success/failure counts, rate-limit decisions, protocol error classes, session revocations, and latency. Security events are durable business audit records and do not replace operational logs.
@@ -30,6 +32,8 @@ Never log passwords, password hashes, cookie contents, authorization codes, acce
 ## Security events
 
 Events are append-only through normal application permissions and contain type, time, outcome, actor and target subjects where relevant, application, request ID, coarse IP prefix, stable reason code, and an allow-listed scalar metadata map. Index by time, subject/time, and type/time. Keep security events online for 400 days initially, subject to legal/operational review; archival or deletion is an explicit operator process rather than TTL in v1. Failed-login volume may later move to a summarized/partitioned stream if scale justifies it.
+
+Metadata is typed per event and runtime-rejects objects plus known secret-bearing keys. Provisioning, credential creation/upgrade, session create/rotate/revoke, global invalidation, suspension, and restoration write their audit record inside the same MongoDB transaction as the state change. Audit failure aborts those operations. Rate-limit denial audit failure is surfaced as storage failure and handled by the caller's explicit failure policy; it is never silently treated as an allowance.
 
 ## Production gates
 

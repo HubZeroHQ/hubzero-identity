@@ -6,7 +6,7 @@ Architecture, threat model, domain contracts, index definitions, environment con
 
 ## Phase 2 — identity security core
 
-Implement MongoDB collection modules and migrations; email normalization; Argon2id password service plus bcrypt verification adapter; opaque browser session lifecycle; security-event writer; atomic shared rate limiter contract; audited provisioning CLI; and integration tests. No OIDC endpoints or production migration.
+Implemented on `phase-2/security-core`: controlled MongoDB indexes and typed collections; normalization v1; Argon2id plus atomic bcrypt upgrade; opaque session lifecycle; durable typed security events; MongoDB rate limiter; audited provisioning CLI; and real replica-set integration tests. No OIDC endpoints or production migration.
 
 ## Phase 3 — account authentication surface
 

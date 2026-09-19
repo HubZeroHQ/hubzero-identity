@@ -26,6 +26,8 @@ There is no Edge runtime for password, session, MongoDB, or provider code.
 
 `IdentityUser.subject` is a generated `hz_`-prefixed ULID. It is immutable, never reused, not derived from email, and becomes OIDC `sub`. Email has both presentation and normalized forms; a unique index enforces normalized-email ownership. `emailVerifiedAt` carries more information than a Boolean. `sessionVersion` provides constant-time global invalidation. Suspension prevents new authentication, token exchange/refresh, and use of existing Identity sessions.
 
+Phase 2 implements email normalization version 1 as trim, NFC normalization, and lowercase of an ASCII address. It deliberately does not rewrite dots, plus tags, or provider aliases. Internationalized addresses require a new normalization version and collision analysis; an implementation change may never silently re-canonicalize existing accounts.
+
 ### Application
 
 Applications have immutable IDs and public client identifiers, explicit exact redirect/post-logout URI arrays, client type, first-party flag, visibility, enabled state, and small UI branding metadata. Dynamic registration, arbitrary custom claims, per-client themes, tenants, and organizations are excluded.
@@ -48,9 +50,13 @@ The password policy is 12 Unicode characters minimum, 1024 UTF-8 bytes maximum, 
 
 The browser Identity session is an opaque, high-entropy cookie. Only its keyed hash is stored. It is HttpOnly, Secure in non-local environments, `SameSite=Lax`, path `/`, and uses a `__Host-` name in production. Creation always rotates any pre-authentication identifier. Default policy: 7-day idle, 30-day absolute lifetime, rotate at least daily and after privilege/security changes.
 
+The implemented token is `ses_<ULID>.<32 random bytes encoded base64url>`. The ID is non-secret and supports administration; the bearer portion is never persisted. A domain-separated HMAC-SHA-256 lookup value is stored. Daily rotation atomically replaces the current hash and accepts the immediately previous hash for two minutes so parallel browser requests do not randomly sign the user out. Only the winning rotation response receives the new bearer value. Revocation, expiration, version mismatch, and suspension override both hashes.
+
 An authorization code is single-use, short-lived (target 60 seconds), audience/client/redirect-bound, PKCE-bound, and stored hashed. Access tokens are short-lived and minimally scoped. Refresh tokens use rotation and family reuse detection; reuse revokes the family and records an event. A product establishes its own server-controlled session after callback and re-checks current membership/role for authorization. It must not treat ID-token claims as permanent authorization state.
 
 Session invalidation combines per-session `revokedAt`, account `sessionVersion`, account status, expiration, and (where applicable) membership checks. Sign out everywhere increments the version and revokes current rows. Password reset/change defaults to invalidating other sessions. Signing out of Identity does not falsely promise universal product logout; OIDC logout/back-channel logout support will be explicit per client.
+
+Suspension both increments `sessionVersion` and transactionally revokes active session rows. Restoration increments the version again and never clears revocation, so old sessions cannot resurrect. A validation that linearizes before a revocation/suspension transaction may finish; every validation initiated after the transaction commits fails.
 
 ## Protocol contract
 
