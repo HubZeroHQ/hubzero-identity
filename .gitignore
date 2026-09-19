@@ -1,0 +1,25 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+
+# production
+/build
+
+# local environment (the example is intentionally committed)
+.env*
+!.env.example
+
+# test and tooling output
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# logs and OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
