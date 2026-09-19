@@ -8,9 +8,9 @@ Identity must be a standards-based provider, not a custom approximation. Next.js
 
 ## Decision
 
-Adopt the actively maintained, OpenID-certified `oidc-provider` v9 line in a Node.js runtime. Configure only Authorization Code, S256 PKCE, OIDC, revocation, and required logout behavior. Implement MongoDB adapters and HubZero interaction pages. Pin and review the exact version in Phase 4.
+Adopt `oidc-provider` 9.12.2 in a Node.js runtime. Configure only first-party Authorization Code + S256 PKCE, OIDC discovery/JWKS, confidential clients, and HubZero-owned interaction pages. Revocation, refresh tokens, UserInfo, dynamic registration, and RP-initiated logout remain disabled until a concrete requirement exists. The provider is mounted by the Phase 4 custom Node entry and uses a persistent MongoDB adapter.
 
-The library is not added in Phase 1 because no protocol endpoint is being implemented. Phase 4 first proves same-origin deployment with normal Next routing or a custom server and records the final mount decision.
+The library was not added in Phase 1 because no protocol endpoint was being implemented. Phase 4's deployment spike selected the custom entry after evaluating a separate provider process and App Router handlers.
 
 ## Alternatives considered
 
@@ -22,6 +22,8 @@ The library is not added in Phase 1 because no protocol endpoint is being implem
 ## Consequences
 
 We inherit a mature protocol core but must own secure configuration, adapters, interactions, upgrades, conformance testing, key management, and deployment lifecycle. Domain contracts remain framework-independent.
+
+Phase 4 completed the deployment spike: the custom Node entry topology is accepted in ADR 0013 and the concrete narrow protocol/key decisions are recorded in ADR 0014.
 
 ## Evidence
 

@@ -12,11 +12,7 @@ Products must not read Identity collections, share cookies, receive password has
 
 ## Deployment shape
 
-One Node.js deployable owns the Next.js App Router UI and identity domain modules. MongoDB is the durable store. Protocol implementation will use `oidc-provider`; Phase 4 must spike its mount behind the same `auth.hubzero.in` origin without coupling domain persistence to framework request objects. The preferred order is:
-
-1. normal Next.js server plus a deployment-level route to an in-deployment provider process, if the target platform supports one release unit and shared lifecycle;
-2. a small custom Node entry that mounts `oidc-provider` and delegates other requests to Next, if operational simplicity outweighs lost Next optimizations;
-3. separate services only if deployment constraints demand it, while retaining one repository and release boundary initially.
+One Node.js deployable owns the Next.js App Router UI and identity domain modules. MongoDB is the durable store. Phase 4 selected a small custom Node entry (`server.ts`) that mounts maintained `oidc-provider` and delegates all non-protocol requests to Next. This preserves one canonical origin and release lifecycle while accepting the documented custom-server trade-off that Next standalone tracing and some automatic static optimization are unavailable. A separate provider process behind trusted deployment routing remains a future operational option; OAuth/OIDC is never hand-rolled.
 
 There is no Edge runtime for password, session, MongoDB, or provider code.
 
@@ -52,7 +48,7 @@ The browser Identity session is an opaque, high-entropy cookie. Only its keyed h
 
 The implemented token is `ses_<ULID>.<32 random bytes encoded base64url>`. The ID is non-secret and supports administration; the bearer portion is never persisted. A domain-separated HMAC-SHA-256 lookup value is stored. Daily rotation atomically replaces the current hash and accepts the immediately previous hash for two minutes so parallel browser requests do not randomly sign the user out. Only the winning rotation response receives the new bearer value. Revocation, expiration, version mismatch, and suspension override both hashes.
 
-An authorization code is single-use, short-lived (target 60 seconds), audience/client/redirect-bound, PKCE-bound, and stored hashed. Access tokens are short-lived and minimally scoped. Refresh tokens use rotation and family reuse detection; reuse revokes the family and records an event. A product establishes its own server-controlled session after callback and re-checks current membership/role for authorization. It must not treat ID-token claims as permanent authorization state.
+An authorization code is single-use, short-lived (60 seconds), audience/client/redirect-bound, PKCE-bound, and stored through the provider adapter. Phase 4 access tokens are opaque and five minutes long; refresh tokens are intentionally disabled until a product demonstrates a need. A product establishes its own server-controlled session after callback and re-checks current membership/role for authorization. It must not treat ID-token claims as permanent authorization state.
 
 Session invalidation combines per-session `revokedAt`, account `sessionVersion`, account status, expiration, and (where applicable) membership checks. Sign out everywhere increments the version and revokes current rows. Password reset/change defaults to invalidating other sessions. Signing out of Identity does not falsely promise universal product logout; OIDC logout/back-channel logout support will be explicit per client.
 
@@ -76,6 +72,10 @@ Required endpoints (final paths follow provider defaults unless ADR amendment is
 Baseline scopes are `openid`, `profile`, and `email`. ID-token/userinfo claims are `iss`, `sub`, `aud`, `iat`, `exp`, optional `auth_time`, `nonce`, `name`, `picture`, `email`, and `email_verified`. `accountType`, membership, Studio role, and disabled state are not durable authorization claims in general-purpose tokens.
 
 Confidential web clients authenticate at token endpoints. Authorization requests require state and nonce at the client and S256 PKCE at Identity. Redirect matching is exact; production wildcards and pattern matching are forbidden. Only HTTPS production URIs are allowed. Loopback HTTP is permitted for registered local development callbacks.
+
+### Phase 4 provider override
+
+The Phase 4 provider currently enables only discovery, JWKS, Authorization Code, and token exchange. Authorization Code is the only grant and S256 PKCE is mandatory. Access tokens are opaque with a five-minute lifetime; refresh tokens, UserInfo, revocation, dynamic registration, and RP-initiated logout are disabled. The provider's canonical production issuer remains `https://auth.hubzero.in`; test issuers are explicit and isolated. See ADR 0014 for the rationale and deferred protocol surface.
 
 ## Environments
 

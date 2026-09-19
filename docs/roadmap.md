@@ -14,7 +14,7 @@ Implemented on `phase-3/auth-lifecycle`: real credential sign-in/out, guarded Hu
 
 ## Phase 4 — standards provider
 
-Complete the deployment spike, integrate `oidc-provider` with MongoDB adapters and HubZero interactions, configure Authorization Code + S256 PKCE, discovery/JWKS/key rotation, claims, token/refresh lifecycle, logout, conformance tests, and register non-production clients.
+Implemented on the Phase 4 branch: deployment spike and custom Node/Next topology; persistent `oidc-provider` MongoDB adapter; exact confidential clients; Authorization Code + mandatory S256 PKCE; HubZero interaction/SSO and membership denial; discovery/JWKS with ES256 configuration; opaque short-lived access tokens; and isolated two-client browser proof. Production client registration, key/index initialization, Studio/Fitness integration, and broader logout/refresh features remain rollout work.
 
 ## Phase 5 — membership operations
 
