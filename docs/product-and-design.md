@@ -52,6 +52,6 @@ At 720 px and below, the desktop rail becomes a compact brand header and horizon
 
 Use semantic landmarks/headings/forms, programmatic labels, correct `autocomplete`, keyboard-operable controls, visible `:focus-visible`, text alongside color, polite live regions for asynchronous outcomes, and focus transfer for navigation/errors/dialogs. Respect `prefers-reduced-motion`; baseline screens have no unsolicited motion. Server-render forms should use progressive POST behavior where possible and fail closed if client protocol state is unavailable.
 
-## Representative data
+## Live account data
 
-All Phase 1 names, sessions, memberships, and statuses in `src/app` are development fixtures rendered directly in pages. The persistent “Design preview” label prevents them from being confused with authenticated state. Phase 3 must replace fixtures through server-side domain services; it must not layer mock login behavior over them.
+Phase 3 replaces the Phase 1 Account, Profile, Security, Sessions, Applications, and sign-in fixtures with server-side Identity data. The Account shell displays only permitted user-facing values: name, email, membership/application labels, and conservative browser summaries. It does not display subjects, MongoDB IDs, hashes, raw IPs, or internal security versions. Studio role information remains absent until Studio provides its own contract.

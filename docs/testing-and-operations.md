@@ -15,6 +15,8 @@ End-to-end tests eventually run two small relying-party fixtures:
 
 Keyboard-only, screen-reader semantics, reduced motion, mobile viewports, JS-disabled sign-in POST behavior, and cross-browser cookie behavior are release checks. Protocol conformance tests supplement, not replace, domain tests.
 
+Phase 3 adds a real Chromium browser suite. It starts a production-mode local Next server with an isolated Docker MongoDB replica set and only `@e2e.invalid` accounts. The command passes explicit test environment variables to the child process, so `.env.local` cannot become its runtime database. The suite exercises sign-in, generic errors, rate limiting, forced and voluntary password changes, account guards, session revocation/replacement/rotation, logout, and suspension.
+
 ## Operational checks
 
 Each release verifies install reproducibility, lint, types, tests, production build, secret scan, dependency audit, index plan, migration dry-run, backup/restore posture, and staging smoke tests. Authentication material is synthetic. No CI job receives production database access.

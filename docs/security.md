@@ -44,3 +44,9 @@ Metadata is typed per event and runtime-rejects objects plus known secret-bearin
 - distributed limiter fail behavior decided and tested
 - dependency scan, SAST, protocol conformance, and focused penetration test completed
 - incident response owner and account-recovery identity proofing established
+
+## Phase 3 browser controls
+
+Sign-in uses generic public failure copy for unknown email, absent credential, and mismatch. Unknown-email paths do one valid dummy Argon2id verification to avoid a gross timing split without introducing a per-request hash generation cost. Normal failed credentials are not durable audit events; durable success, post-proof unavailable-account, session, password, profile, and throttling events are constrained typed records.
+
+All state-changing account Server Actions validate the exact `IDENTITY_ISSUER_URL` origin. Safe return paths are Identity-relative only; OAuth client redirect semantics are explicitly deferred. Production cookies use the host-only `__Host-hz_session` contract. A nonce CSP from `proxy.ts` blocks framing, objects, third-party connections, and untrusted scripts/styles in production; Next development allowances are limited to development.

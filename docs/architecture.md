@@ -94,4 +94,10 @@ Localhost, preview/staging, and production use different issuers, databases, sig
 
 ## Repository boundaries
 
-Protocol/domain logic lives under `src/domain` and `src/lib`, never in React components. `src/app` composes server-rendered product surfaces. Database access is collection-specific and direct; no generic repository abstraction is introduced without a concrete need. The Phase 1 screens use immutable development fixtures and are visibly marked as previews.
+Protocol/domain logic lives under `src/domain` and `src/lib`, never in React components. `src/app` composes server-rendered product surfaces. Database access is collection-specific and direct; no generic repository abstraction is introduced without a concrete need. Phase 3 replaces the Phase 1 Account and sign-in fixtures with server-side Identity data; Studio authorization examples remain representative until Phase 4.
+
+## Phase 3 account lifecycle
+
+The Account UI now resolves a narrow server-side session context from the Identity cookie. It does not expose raw bearer material to components. Account routes redirect unauthenticated visitors to `/sign-in` with a validated relative return path. `mustChangePassword` is an enforced route gate, not a navigation convention. Sign-in, profile changes, password changes, session revocation, and logout call domain services; components and Server Actions do not reproduce Phase 2 credential/session logic.
+
+Server Component validation defers session rotation. A dedicated same-origin internal route performs the Phase 2 rotation and writes the replacement HttpOnly cookie because Server Components cannot mutate cookies while rendering. This route is not a product integration or OAuth/OIDC endpoint.

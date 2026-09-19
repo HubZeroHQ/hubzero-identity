@@ -10,7 +10,7 @@ Implemented on `phase-2/security-core`: controlled MongoDB indexes and typed col
 
 ## Phase 3 — account authentication surface
 
-Implement login/logout, mandatory password-change gate, account/profile/security/session pages backed by real domain services, CSRF/origin controls, security headers, session revocation, and sign-out-everywhere.
+Implemented on `phase-3/auth-lifecycle`: real credential sign-in/out, guarded HubZero Account pages, forced and voluntary password change, profile name edits, session management and revocation, membership display, same-origin mutation checks, CSP/host protections, and isolated real-browser tests. OAuth/OIDC remains deferred.
 
 ## Phase 4 — standards provider
 
