@@ -1,0 +1,69 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope";
+
+:root {
+  --paper: #fbfbfa;
+  --surface: #ffffff;
+  --ink: #17191c;
+  --muted: #636970;
+  --faint: #8d9298;
+  --line: #dfe2e5;
+  --line-strong: #bdc3c9;
+  --signal: #1d4ed8;
+  --signal-hover: #193fae;
+  --signal-soft: #edf2ff;
+  --danger: #b42318;
+  --danger-soft: #fff1f0;
+  --success: #176b47;
+  --success-soft: #eaf7f0;
+  --warning: #8a4b08;
+  --warning-soft: #fff5df;
+  --radius-sm: 5px;
+  --radius-md: 9px;
+  --focus: 0 0 0 3px rgba(29, 78, 216, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--paper); color-scheme: light; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Manrope Variable", "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+}
+
+button, input { font: inherit; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}
+
+::selection { background: #cad8ff; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

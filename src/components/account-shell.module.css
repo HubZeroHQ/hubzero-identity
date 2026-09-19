@@ -1,0 +1,27 @@
+.frame { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+.rail { position: sticky; top: 0; height: 100vh; padding: 32px 24px 22px; border-right: 1px solid var(--line); background: #f6f7f7; display: flex; flex-direction: column; }
+.brand { padding: 0 10px 48px; }
+.nav { display: grid; gap: 3px; }
+.nav a { min-height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 11px; color: var(--muted); border-radius: var(--radius-sm); font-size: 14px; font-weight: 570; }
+.nav a:hover { color: var(--ink); background: #eceeef; }
+.nav a.current { color: var(--signal); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.person { margin-top: auto; border-top: 1px solid var(--line); padding: 19px 8px 0; display: flex; gap: 10px; align-items: center; min-width: 0; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #dce4fb; color: #153a9f; font-size: 11px; font-weight: 750; flex: 0 0 auto; }
+.person span:last-child { min-width: 0; display: grid; }
+.person strong { font-size: 12px; font-weight: 680; }
+.person small { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.content { padding: 42px clamp(32px, 6vw, 96px) 80px; max-width: 1060px; width: 100%; }
+.previewDesktop { color: var(--faint); font-size: 11px; text-align: right; margin-bottom: 54px; }
+.mobileHeader, .mobileNav { display: none; }
+.preview { color: var(--faint); font-size: 10px; }
+
+@media (max-width: 720px) {
+  .frame { display: block; }
+  .rail { display: none; }
+  .mobileHeader { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 15px; }
+  .mobileNav { display: flex; gap: 4px; overflow-x: auto; padding: 0 16px 11px; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+  .mobileNav a { white-space: nowrap; padding: 8px 9px; color: var(--muted); font-size: 13px; font-weight: 570; border-radius: var(--radius-sm); }
+  .mobileNav a[aria-current="page"] { color: var(--signal); background: var(--signal-soft); }
+  .content { padding: 34px 20px 64px; }
+  .previewDesktop { display: none; }
+}

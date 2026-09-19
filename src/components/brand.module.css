@@ -1,0 +1,7 @@
+.brand { display: inline-flex; align-items: center; gap: 11px; font-weight: 720; letter-spacing: -0.025em; }
+.name { font-size: 18px; }
+.mark { position: relative; width: 21px; height: 21px; display: grid; grid-template-columns: repeat(3, 5px); gap: 3px; align-items: end; }
+.mark i { display: block; width: 5px; background: var(--ink); border-radius: 1px; }
+.mark i:nth-child(1) { height: 12px; }
+.mark i:nth-child(2) { height: 20px; }
+.mark i:nth-child(3) { height: 8px; }

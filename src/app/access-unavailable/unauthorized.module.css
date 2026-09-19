@@ -1,0 +1,10 @@
+.block { margin-bottom: 32px; }
+.code { color: var(--danger); font-size: 11px; font-weight: 750; }
+.block h1 { margin: 7px 0 9px; font-size: 31px; line-height: 1.2; letter-spacing: -0.045em; font-weight: 680; }
+.block p { margin: 0; color: var(--muted); max-width: 360px; }
+.signedIn { padding: 16px 17px; display: grid; border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 24px; }
+.signedIn small { color: var(--muted); font-size: 11px; }
+.signedIn strong { font-size: 13px; margin-top: 2px; }
+.actions { display: flex; align-items: center; gap: 20px; }
+.actions > button:last-child { border: 0; background: transparent; color: var(--signal); padding: 8px 0; font-size: 12px; font-weight: 650; cursor: pointer; }
+@media (max-width: 420px) { .actions { align-items: flex-start; flex-direction: column; gap: 8px; } }
