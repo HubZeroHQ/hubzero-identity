@@ -4,6 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { IdentitySubject } from "@/domain/identity";
 import type { ApplicationId } from "@/domain/applications";
 import { AccountSecurityService } from "@/lib/identity/account-security";
+import { AccountPasswordService } from "@/lib/credentials/account-password";
+import { ProfileService } from "@/lib/identity/profile";
 import { CredentialService } from "@/lib/credentials/service";
 import { PasswordService, parseBcryptHash } from "@/lib/credentials/password";
 import { applyIdentityIndexes, IndexMigrationConflictError } from "@/lib/db/indexes";
@@ -165,6 +167,52 @@ describe("identity security core with MongoDB", () => {
     expect(await sessions.revokeAll(account.subject, actorSubject, "security_change")).toBe(2);
     expect(await sessions.validate(first.token)).toBeNull();
     expect(await sessions.validate(second.token)).toBeNull();
+  });
+
+  it("changes a password transactionally, clears the forced-change flag, and replaces every old bearer session", async () => {
+    const account = await provision("password-change@example.com", "request-key-00000022");
+    const sessions = new SessionService(database, client, Buffer.alloc(32, 10), events, clock);
+    const first = await sessions.create({ identitySubject: account.subject });
+    const second = await sessions.create({ identitySubject: account.subject });
+    await identityCredentialsCollection(database).updateOne({ identitySubject: account.subject }, { $set: { mustChangePassword: true } });
+    const changes = new AccountPasswordService(database, client, passwords, Buffer.alloc(32, 10), events, clock);
+    const result = await changes.change({
+      identitySubject: account.subject,
+      currentPassword: password,
+      newPassword: "a new durable test passphrase",
+      forced: true,
+    });
+    expect(await sessions.validate(first.token)).toBeNull();
+    expect(await sessions.validate(second.token)).toBeNull();
+    expect(await sessions.validate(result.token)).not.toBeNull();
+    const credential = await identityCredentialsCollection(database).findOne({ identitySubject: account.subject });
+    expect(credential?.mustChangePassword).toBe(false);
+    await expect(passwords.verify(credential!, "a new durable test passphrase")).resolves.toMatchObject({ valid: true });
+    expect(await identitySecurityEventsCollection(database).countDocuments({ type: "password.forced_change_completed" })).toBe(1);
+  });
+
+  it("replaces all sessions with one fresh current session without resurrecting old material", async () => {
+    const account = await provision("other-sessions@example.com", "request-key-00000023");
+    const sessions = new SessionService(database, client, Buffer.alloc(32, 11), events, clock);
+    const first = await sessions.create({ identitySubject: account.subject });
+    const second = await sessions.create({ identitySubject: account.subject });
+    const fresh = await sessions.replaceAllWithFreshSession({ identitySubject: account.subject }, "user_signed_out_other_sessions");
+    expect(fresh.revokedCount).toBe(2);
+    expect(await sessions.validate(first.token)).toBeNull();
+    expect(await sessions.validate(second.token)).toBeNull();
+    expect(await sessions.validate(fresh.token)).not.toBeNull();
+    expect(await identitySecurityEventsCollection(database).countDocuments({ type: "session.other_sessions_revoked" })).toBe(1);
+  });
+
+  it("audits meaningful profile name changes without altering the immutable subject or email", async () => {
+    const account = await provision("profile@example.com", "request-key-00000024");
+    const profile = new ProfileService(database, client, events, clock);
+    expect(await profile.changeName(account.subject, "Updated Person")).toBe(true);
+    const user = await identityUsersCollection(database).findOne({ subject: account.subject });
+    expect(user?.subject).toBe(account.subject);
+    expect(user?.email).toBe("profile@example.com");
+    expect(user?.name).toBe("Updated Person");
+    expect(await identitySecurityEventsCollection(database).countDocuments({ type: "profile.changed" })).toBe(1);
   });
 
   it("suspends centrally and restoration does not resurrect old sessions", async () => {

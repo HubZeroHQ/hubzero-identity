@@ -106,5 +106,6 @@ export interface RateLimitDocument {
   count: number;
   windowStartedAt: Date;
   expiresAt: Date;
+  lastTriggeredAt?: Date | null;
   updatedAt: Date;
 }

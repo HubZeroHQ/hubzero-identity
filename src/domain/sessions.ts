@@ -24,6 +24,7 @@ export const sessionPolicy = {
   absoluteLifetimeSeconds: 60 * 60 * 24 * 30,
   rotateAfterSeconds: 60 * 60 * 24,
   previousSecretGraceSeconds: 60 * 2,
+  activityUpdateAfterSeconds: 60 * 5,
   cookieName: "__Host-hz_session",
   cookie: {
     httpOnly: true,

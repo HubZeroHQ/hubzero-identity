@@ -28,6 +28,11 @@ export interface CreateSessionInput {
   ipPrefix?: string | null;
 }
 
+export interface SessionAuditEvent {
+  type: "login.succeeded";
+  metadata: { credentialAlgorithm: "argon2id" | "bcrypt" };
+}
+
 export interface CreatedSession {
   sessionId: string;
   token: string;
@@ -41,6 +46,11 @@ export interface ValidatedSession {
   rotatedToken: string | null;
   idleExpiresAt: Date;
   absoluteExpiresAt: Date;
+  needsRotation: boolean;
+}
+
+export interface SessionValidationOptions {
+  allowRotation?: boolean;
 }
 
 export class SessionService {
@@ -54,7 +64,7 @@ export class SessionService {
     if (hmacKey.byteLength < 32) throw new Error("Session HMAC key must contain at least 32 bytes");
   }
 
-  async create(input: CreateSessionInput): Promise<CreatedSession> {
+  async create(input: CreateSessionInput, additionalEvent?: SessionAuditEvent): Promise<CreatedSession> {
     const now = this.clock.now();
     const sessionId = `ses_${createUlid(now.getTime())}`;
     const material = createSessionSecret(sessionId);
@@ -84,12 +94,15 @@ export class SessionService {
         ipPrefix: input.ipPrefix?.slice(0, 80) ?? null,
       }, { session });
       await this.events.append("session.created", { sessionId }, { targetSubject: input.identitySubject }, session);
+      if (additionalEvent) {
+        await this.events.append(additionalEvent.type, additionalEvent.metadata, { targetSubject: input.identitySubject }, session);
+      }
       return true;
     });
     return { sessionId, token: material.token, idleExpiresAt, absoluteExpiresAt };
   }
 
-  async validate(token: string): Promise<ValidatedSession | null> {
+  async validate(token: string, options: SessionValidationOptions = {}): Promise<ValidatedSession | null> {
     const parsed = parseSessionToken(token);
     if (!parsed) return null;
     const sessions = identitySessionsCollection(this.database);
@@ -109,7 +122,8 @@ export class SessionService {
     if (!account || account.status !== "active" || account.sessionVersion !== record.sessionVersion) return null;
     const nextIdleExpiry = minDate(addSeconds(now, sessionPolicy.idleLifetimeSeconds), record.absoluteExpiresAt);
 
-    if (currentMatches && now.getTime() - record.rotatedAt.getTime() >= sessionPolicy.rotateAfterSeconds * 1000) {
+    const needsRotation = currentMatches && now.getTime() - record.rotatedAt.getTime() >= sessionPolicy.rotateAfterSeconds * 1000;
+    if (needsRotation && options.allowRotation !== false) {
       const nextMaterial = createSessionSecret(record.id);
       const nextHash = hashSessionSecret(record.id, nextMaterial.secret, this.hmacKey);
       const previousSecretValidUntil = addSeconds(now, sessionPolicy.previousSecretGraceSeconds);
@@ -134,12 +148,16 @@ export class SessionService {
         return true;
       });
       if (rotated) {
-        return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: nextMaterial.token, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt };
+        return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: nextMaterial.token, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation: false };
       }
       record = await sessions.findOne({ _id: record._id });
       if (!record || record.revokedAt || !record.previousSecretHash || !record.previousSecretValidUntil || record.previousSecretValidUntil <= now || !constantTimeEqual(suppliedHash, record.previousSecretHash)) return null;
     }
 
+    const shouldTouch = now.getTime() - record.lastSeenAt.getTime() >= sessionPolicy.activityUpdateAfterSeconds * 1000;
+    if (!shouldTouch) {
+      return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: record.idleExpiresAt, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation };
+    }
     const touch = await sessions.updateOne({
       _id: record._id,
       revokedAt: null,
@@ -152,7 +170,7 @@ export class SessionService {
       ],
     }, { $set: { lastSeenAt: now, idleExpiresAt: nextIdleExpiry } });
     if (touch.matchedCount !== 1) return null;
-    return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt };
+    return { sessionId: record.id, identitySubject: record.identitySubject, rotatedToken: null, idleExpiresAt: nextIdleExpiry, absoluteExpiresAt: record.absoluteExpiresAt, needsRotation };
   }
 
   async revoke(sessionId: string, actorSubject: IdentitySubject, reason: string): Promise<boolean> {
@@ -185,6 +203,68 @@ export class SessionService {
       );
       await this.events.append("session.all_revoked", { reason, revokedCount: revoked.modifiedCount }, { actorSubject, targetSubject: identitySubject }, session);
       return revoked.modifiedCount;
+    });
+  }
+
+  async listActive(identitySubject: IdentitySubject, currentSessionId: string) {
+    const now = this.clock.now();
+    return identitySessionsCollection(this.database).find({
+      identitySubject,
+      revokedAt: null,
+      idleExpiresAt: { $gt: now },
+      absoluteExpiresAt: { $gt: now },
+    }, { projection: { currentSecretHash: 0, previousSecretHash: 0 } }).sort({ lastSeenAt: -1 }).toArray().then((sessions) => sessions.map((session) => ({
+      id: session.id,
+      current: session.id === currentSessionId,
+      createdAt: session.createdAt,
+      lastSeenAt: session.lastSeenAt,
+      userAgentSummary: session.userAgentSummary,
+    })));
+  }
+
+  async revokeOwned(identitySubject: IdentitySubject, sessionId: string, reason: string): Promise<boolean> {
+    const owned = await identitySessionsCollection(this.database).findOne({ id: sessionId, identitySubject }, { projection: { _id: 1 } });
+    if (!owned) return false;
+    return this.revoke(sessionId, identitySubject, reason);
+  }
+
+  async replaceAllWithFreshSession(input: CreateSessionInput, reason: string): Promise<CreatedSession & { revokedCount: number }> {
+    const now = this.clock.now();
+    const sessionId = `ses_${createUlid(now.getTime())}`;
+    const material = createSessionSecret(sessionId);
+    const idleExpiresAt = addSeconds(now, sessionPolicy.idleLifetimeSeconds);
+    const absoluteExpiresAt = addSeconds(now, sessionPolicy.absoluteLifetimeSeconds);
+    return withRequiredTransaction(this.client, async (session) => {
+      const account = await identityUsersCollection(this.database).findOneAndUpdate({ subject: input.identitySubject, status: "active" }, {
+        $inc: { sessionVersion: 1 },
+        $set: { updatedAt: now },
+      }, { session, returnDocument: "after" });
+      if (!account) throw new Error("Active account not found");
+      const revoked = await identitySessionsCollection(this.database).updateMany({ identitySubject: input.identitySubject, revokedAt: null }, {
+        $set: { revokedAt: now, revokeReason: reason, previousSecretValidUntil: now },
+      }, { session });
+      await identitySessionsCollection(this.database).insertOne({
+        _id: new ObjectId(),
+        id: sessionId,
+        identitySubject: input.identitySubject,
+        currentSecretHash: hashSessionSecret(sessionId, material.secret, this.hmacKey),
+        previousSecretHash: null,
+        previousSecretValidUntil: null,
+        secretHashVersion: 1,
+        sessionVersion: account.sessionVersion,
+        createdAt: now,
+        lastSeenAt: now,
+        idleExpiresAt,
+        absoluteExpiresAt,
+        rotatedAt: now,
+        revokedAt: null,
+        revokeReason: null,
+        userAgentSummary: input.userAgentSummary?.slice(0, 160) ?? null,
+        ipPrefix: input.ipPrefix?.slice(0, 80) ?? null,
+      }, { session });
+      await this.events.append("session.other_sessions_revoked", { reason, revokedCount: revoked.modifiedCount }, { actorSubject: input.identitySubject, targetSubject: input.identitySubject }, session);
+      await this.events.append("session.created", { sessionId }, { targetSubject: input.identitySubject }, session);
+      return { sessionId, token: material.token, idleExpiresAt, absoluteExpiresAt, revokedCount: revoked.modifiedCount };
     });
   }
 }

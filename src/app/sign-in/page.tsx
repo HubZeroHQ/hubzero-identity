@@ -1,21 +1,22 @@
-import { AuthShell } from "@/components/auth-shell";
-import { Button, Field } from "@/components/ui";
-import { PasswordField } from "./password-field";
-import { PreviewForm } from "@/components/preview-form";
-import styles from "./sign-in.module.css";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { AuthShell } from "@/components/auth-shell";
+import { safeReturnPath } from "@/lib/auth/origin";
+import { getCurrentIdentity } from "@/lib/auth/session-context";
+import { SignInForm } from "./sign-in-form";
+import { StaleSessionCleanup } from "@/components/stale-session-cleanup";
+import styles from "./sign-in.module.css";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: false } };
 
-export default function SignInPage() {
-  return <AuthShell application={{ name: "HubZero Fitness", domain: "fitness.hubzero.in", initial: "F" }}>
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ returnTo?: string; notice?: string }> }) {
+  const current = await getCurrentIdentity();
+  if (current) redirect("/");
+  const query = await searchParams;
+  return <AuthShell>
+    <StaleSessionCleanup />
     <header className={styles.heading}><h1>Welcome back</h1><p>Use your HubZero Account to continue.</p></header>
-    <PreviewForm className={styles.form} describedBy="preview-note">
-      <Field label="Email" type="email" autoComplete="username" />
-      <PasswordField />
-      <span className={styles.fullButton}><Button type="submit">Continue</Button></span>
-      <a className={styles.forgot} href="#recovery">Forgot password?</a>
-      <p className={styles.notice} id="preview-note">This Phase 1 screen is a non-functional design preview. It does not accept or send credentials.</p>
-    </PreviewForm>
+    {query.notice === "signed-out" ? <p className={styles.success} role="status">You have signed out.</p> : null}
+    <SignInForm returnTo={safeReturnPath(query.returnTo)} />
   </AuthShell>;
 }

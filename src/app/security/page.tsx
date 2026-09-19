@@ -1,19 +1,21 @@
-import { AccountShell } from "@/components/account-shell";
-import { Button, Field, PageHeader } from "@/components/ui";
-import styles from "../account.module.css";
-import { PreviewForm } from "@/components/preview-form";
 import type { Metadata } from "next";
+import { AccountShell } from "@/components/account-shell";
+import { PageHeader } from "@/components/ui";
+import { getAccountData } from "@/lib/auth/account-data";
+import { requireFullAccountIdentity } from "@/lib/auth/session-context";
+import { PasswordChangeForm } from "@/app/change-password/password-change-form";
+import styles from "../account.module.css";
 
-export const metadata: Metadata = { title: "Security" };
+export const metadata: Metadata = { title: "Security", robots: { index: false, follow: false } };
 
-export default function SecurityPage() {
-  return <AccountShell current="Security"><PageHeader title="Security" description="Change your password and review how your account is protected." />
-    <PreviewForm className={styles.form}>
-      <Field label="Current password" type="password" autoComplete="current-password" />
-      <Field label="New password" type="password" autoComplete="new-password" />
-      <div className={styles.note}>Use at least 12 characters. A memorable passphrase is a good choice.</div>
-      <Field label="Confirm new password" type="password" autoComplete="new-password" />
-      <div className={styles.formActions}><Button type="submit">Change password</Button></div>
-    </PreviewForm>
+export default async function SecurityPage() {
+  const identity = await requireFullAccountIdentity("/security");
+  const data = await getAccountData(identity.user.subject, identity.sessionId);
+  return <AccountShell current="Security" user={identity.user} needsRotation={identity.needsRotation}>
+    <PageHeader title="Security" description="Change your password and review how your account is protected." />
+    <section className={styles.section} aria-labelledby="password-heading"><div className={styles.sectionHead}><h2 id="password-heading">Password</h2></div><p className={styles.empty}>Last changed {data.credential ? formatDate(data.credential.passwordChangedAt) : "at an unknown time"}. Changing it signs out your other sessions.</p></section>
+    <PasswordChangeForm forced={false} />
   </AccountShell>;
 }
+
+function formatDate(value: Date): string { return new Intl.DateTimeFormat("en", { day: "numeric", month: "long", year: "numeric" }).format(value); }

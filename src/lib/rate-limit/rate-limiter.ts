@@ -61,8 +61,13 @@ export class MongoFixedWindowRateLimiter implements RateLimiter {
       const document = await this.updateBucket(bucketId, request, now, windowExpiresAt);
       const allowed = document.count <= request.limit;
       const retryAfterSeconds = allowed ? 0 : Math.max(1, Math.ceil((document.expiresAt.getTime() - now.getTime()) / 1000));
-      if (!allowed) {
+      if (!allowed && (!document.lastTriggeredAt || document.lastTriggeredAt < document.windowStartedAt)) {
         await this.events.append("rate_limit.triggered", { namespace: request.namespace, retryAfterSeconds }, { outcome: "failure", reasonCode: "rate_limited" });
+        await identityRateLimitsCollection(this.database).updateOne({
+          _id: bucketId,
+          windowStartedAt: document.windowStartedAt,
+          $or: [{ lastTriggeredAt: { $exists: false } }, { lastTriggeredAt: null }, { lastTriggeredAt: { $lt: document.windowStartedAt } }],
+        }, { $set: { lastTriggeredAt: now } });
       }
       return { allowed, remaining: Math.max(0, request.limit - document.count), retryAfterSeconds };
     } catch (error) {

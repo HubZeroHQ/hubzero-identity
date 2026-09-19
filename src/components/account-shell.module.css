@@ -14,6 +14,9 @@
 .previewDesktop { color: var(--faint); font-size: 11px; text-align: right; margin-bottom: 54px; }
 .mobileHeader, .mobileNav { display: none; }
 .preview { color: var(--faint); font-size: 10px; }
+.signOut { display: flex; justify-content: flex-end; margin: -14px 0 32px; }
+.signOut button { border: 0; padding: 8px; color: var(--muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; border-radius: var(--radius-sm); }
+.signOut button:hover { color: var(--ink); background: #f0f1f1; }
 
 @media (max-width: 720px) {
   .frame { display: block; }
@@ -23,5 +26,6 @@
   .mobileNav a { white-space: nowrap; padding: 8px 9px; color: var(--muted); font-size: 13px; font-weight: 570; border-radius: var(--radius-sm); }
   .mobileNav a[aria-current="page"] { color: var(--signal); background: var(--signal-soft); }
   .content { padding: 34px 20px 64px; }
+  .signOut { margin: 0 0 24px; }
   .previewDesktop { display: none; }
 }

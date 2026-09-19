@@ -1,18 +1,15 @@
-import { AccountShell } from "@/components/account-shell";
-import { Button, Field, PageHeader } from "@/components/ui";
-import styles from "../account.module.css";
-import { PreviewForm } from "@/components/preview-form";
 import type { Metadata } from "next";
+import { AccountShell } from "@/components/account-shell";
+import { PageHeader } from "@/components/ui";
+import { requireFullAccountIdentity } from "@/lib/auth/session-context";
+import { ProfileForm } from "./profile-form";
 
-export const metadata: Metadata = { title: "Profile" };
+export const metadata: Metadata = { title: "Profile", robots: { index: false, follow: false } };
 
-export default function ProfilePage() {
-  return <AccountShell current="Profile"><PageHeader title="Profile" description="Details HubZero products may use to identify you." />
-    <PreviewForm className={styles.form}>
-      <Field label="Full name" value="Aarav Rao" autoComplete="name" />
-      <Field label="Email" value="aarav@hubzero.in" type="email" autoComplete="email" />
-      <div className={styles.note}>Changing your email will require verification. Your account identity stays the same.</div>
-      <div className={styles.formActions}><Button type="submit">Save changes</Button><Button tone="secondary">Cancel</Button></div>
-    </PreviewForm>
+export default async function ProfilePage() {
+  const identity = await requireFullAccountIdentity("/profile");
+  return <AccountShell current="Profile" user={identity.user} needsRotation={identity.needsRotation}>
+    <PageHeader title="Profile" description="Details HubZero products may use to identify you." />
+    <ProfileForm name={identity.user.name} email={identity.user.email} />
   </AccountShell>;
 }

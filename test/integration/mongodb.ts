@@ -8,6 +8,7 @@ const mongoImage = "mongo@sha256:4968f22d0c6c10ef29952f3e807f62872ba22b3312f2580
 
 export interface MongoTestInstance {
   client: MongoClient;
+  uri: string;
   stop(): Promise<void>;
 }
 
@@ -46,12 +47,13 @@ export async function startMongoReplicaSet(): Promise<MongoTestInstance> {
     const { stdout } = await execFileAsync("docker", ["port", containerName, "27017/tcp"], { timeout: 10_000, windowsHide: true });
     const port = /127\.0\.0\.1:(\d+)/.exec(stdout)?.[1];
     if (!port) throw new Error(`Could not determine MongoDB test port from: ${stdout}`);
-    const client = new MongoClient(`mongodb://127.0.0.1:${port}/?directConnection=true`, {
+    const uri = `mongodb://127.0.0.1:${port}/?directConnection=true`;
+    const client = new MongoClient(uri, {
       appName: "hubzero-identity-integration-tests",
       serverSelectionTimeoutMS: 10_000,
     });
     await client.connect();
-    return { client, stop: async () => { await client.close(); await stop(); } };
+    return { client, uri, stop: async () => { await client.close(); await stop(); } };
   } catch (error) {
     await stop();
     throw error;

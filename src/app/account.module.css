@@ -30,6 +30,11 @@
 .dangerZone { margin-top: 36px; padding-top: 25px; border-top: 1px solid #e8b6b1; display: flex; justify-content: space-between; gap: 24px; align-items: center; }
 .dangerZone strong { display: block; font-size: 13px; }
 .dangerZone p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.dangerButton { min-height: 42px; border-radius: var(--radius-sm); padding: 0 14px; border: 1px solid #e8b6b1; color: var(--danger); background: var(--surface); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.dangerButton:hover:not(:disabled) { background: var(--danger-soft); }
+.dangerButton:disabled { opacity: 0.5; cursor: not-allowed; }
+.currentLabel { color: var(--success); font-size: 12px; font-weight: 630; }
+.empty { margin: 0; max-width: 620px; color: var(--muted); font-size: 12px; }
 .applicationDetail { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 14px; padding: 22px 0; border-bottom: 1px solid var(--line); align-items: center; }
 .applicationDetail:first-of-type { border-top: 1px solid var(--line); }
 .applicationDetail p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }

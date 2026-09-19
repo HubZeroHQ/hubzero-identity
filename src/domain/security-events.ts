@@ -9,11 +9,14 @@ export const securityEventTypes = [
   "login.succeeded",
   "login.failed",
   "password.changed",
+  "password.forced_change_completed",
+  "profile.changed",
   "password.legacy_migrated",
   "session.created",
   "session.rotated",
   "session.revoked",
   "session.all_revoked",
+  "session.other_sessions_revoked",
   "membership.granted",
   "membership.revoked",
   "admin.operation",
@@ -45,11 +48,14 @@ export type SecurityEventMetadataByType = {
   "login.succeeded": { credentialAlgorithm: "argon2id" | "bcrypt" };
   "login.failed": { reason: string };
   "password.changed": { sessionsInvalidated: boolean };
+  "password.forced_change_completed": { sessionsInvalidated: boolean };
+  "profile.changed": { changedFields: string };
   "password.legacy_migrated": { fromAlgorithm: "bcrypt"; toAlgorithm: "argon2id"; legacyCost: number };
   "session.created": { sessionId: string };
   "session.rotated": { sessionId: string };
   "session.revoked": { sessionId: string; reason: string };
   "session.all_revoked": { reason: string; revokedCount: number };
+  "session.other_sessions_revoked": { reason: string; revokedCount: number };
   "membership.granted": { status: "active" };
   "membership.revoked": { previousStatus: "active" | "disabled" };
   "admin.operation": { operation: string; reason: string };
@@ -81,11 +87,14 @@ const allowedMetadataKeys: Record<SecurityEventType, readonly string[]> = {
   "login.succeeded": ["credentialAlgorithm"],
   "login.failed": ["reason"],
   "password.changed": ["sessionsInvalidated"],
+  "password.forced_change_completed": ["sessionsInvalidated"],
+  "profile.changed": ["changedFields"],
   "password.legacy_migrated": ["fromAlgorithm", "toAlgorithm", "legacyCost"],
   "session.created": ["sessionId"],
   "session.rotated": ["sessionId"],
   "session.revoked": ["sessionId", "reason"],
   "session.all_revoked": ["reason", "revokedCount"],
+  "session.other_sessions_revoked": ["reason", "revokedCount"],
   "membership.granted": ["status"],
   "membership.revoked": ["previousStatus"],
   "admin.operation": ["operation", "reason"],

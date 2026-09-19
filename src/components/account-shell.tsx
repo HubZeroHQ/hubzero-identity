@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Brand } from "./brand";
 import { DeviceIcon, GridIcon, OverviewIcon, ShieldIcon, UserIcon } from "./icons";
+import { signOutAction } from "@/app/actions";
+import { SessionRefresh } from "./session-refresh";
 import styles from "./account-shell.module.css";
 
 const navigation = [
@@ -11,9 +13,11 @@ const navigation = [
   { href: "/applications", label: "Applications", icon: GridIcon },
 ] as const;
 
-export function AccountShell({ current, children }: { current: string; children: React.ReactNode }) {
+export function AccountShell({ current, user, needsRotation = false, children }: { current: string; user: { name: string; email: string }; needsRotation?: boolean; children: React.ReactNode }) {
+  const initials = user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "HZ";
   return (
     <div className={styles.frame}>
+      <SessionRefresh needed={needsRotation} />
       <aside className={styles.rail}>
         <div className={styles.brand}><Brand /></div>
         <nav aria-label="Account navigation" className={styles.nav}>
@@ -24,16 +28,17 @@ export function AccountShell({ current, children }: { current: string; children:
           ))}
         </nav>
         <div className={styles.person}>
-          <span className={styles.avatar} aria-hidden="true">AR</span>
-          <span><strong>Aarav Rao</strong><small>aarav@hubzero.in</small></span>
+          <span className={styles.avatar} aria-hidden="true">{initials}</span>
+          <span><strong>{user.name}</strong><small>{user.email}</small></span>
         </div>
       </aside>
-      <div className={styles.mobileHeader}><Brand /><span className={styles.preview}>Design preview</span></div>
+      <div className={styles.mobileHeader}><Brand /></div>
       <nav className={styles.mobileNav} aria-label="Account navigation">
         {navigation.map(({ href, label }) => <Link key={href} href={href} aria-current={current === label ? "page" : undefined}>{label}</Link>)}
       </nav>
       <main id="main-content" className={styles.content}>
         <div className={styles.previewDesktop}>Design preview · no live account data</div>
+        <form className={styles.signOut} action={signOutAction}><button type="submit">Sign out</button></form>
         {children}
       </main>
     </div>
