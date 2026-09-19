@@ -20,7 +20,12 @@ describe("identity contracts", () => {
 
   it("rejects sensitive security event metadata", () => {
     expect(() => assertSafeEventMetadata({ clientId: "studio", attempt: 2 })).not.toThrow();
+    expect(() => assertSafeEventMetadata({ optionalValue: null })).not.toThrow();
     expect(() => assertSafeEventMetadata({ accessToken: "do-not-log" })).toThrow();
+    expect(() => assertSafeEventMetadata({ passwordHash: "do-not-log" })).toThrow();
+    expect(() => assertSafeEventMetadata({ sessionSecret: "do-not-log" })).toThrow();
+    expect(() => assertSafeEventMetadata({ nested: { unsafe: true } })).toThrow();
+    expect(() => assertSafeEventMetadata({ unexpected: true }, "session.created")).toThrow();
   });
 
   it("invalidates sessions when the account session version changes", () => {

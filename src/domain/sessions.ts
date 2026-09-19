@@ -3,7 +3,10 @@ import type { IdentitySubject } from "./identity";
 export interface IdentitySession {
   id: string;
   identitySubject: IdentitySubject;
-  secretHash: string;
+  currentSecretHash: string;
+  previousSecretHash: string | null;
+  previousSecretValidUntil: Date | null;
+  secretHashVersion: number;
   sessionVersion: number;
   createdAt: Date;
   lastSeenAt: Date;
@@ -20,6 +23,7 @@ export const sessionPolicy = {
   idleLifetimeSeconds: 60 * 60 * 24 * 7,
   absoluteLifetimeSeconds: 60 * 60 * 24 * 30,
   rotateAfterSeconds: 60 * 60 * 24,
+  previousSecretGraceSeconds: 60 * 2,
   cookieName: "__Host-hz_session",
   cookie: {
     httpOnly: true,

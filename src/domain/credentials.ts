@@ -15,6 +15,21 @@ export interface PasswordCredential {
   updatedAt: Date;
 }
 
+export interface Argon2idParameters {
+  [key: string]: string | number;
+  version: 19;
+  memoryCostKiB: number;
+  timeCost: number;
+  parallelism: number;
+  hashLength: number;
+}
+
+export interface BcryptParameters {
+  [key: string]: string | number;
+  version: "2a" | "2b";
+  cost: number;
+}
+
 export const passwordPolicy = {
   minimumCharacters: 12,
   maximumUtf8Bytes: 1024,

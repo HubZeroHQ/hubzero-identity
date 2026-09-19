@@ -7,6 +7,7 @@ export interface IdentityUser {
   /** Opaque, immutable, non-reassigned subject. Never derived from email. */
   subject: IdentitySubject;
   normalizedEmail: string;
+  emailNormalizationVersion: number;
   email: string;
   emailVerifiedAt: Date | null;
   name: string;

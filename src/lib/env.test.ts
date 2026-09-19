@@ -13,4 +13,14 @@ describe("environment validation", () => {
   it("requires HTTPS and secrets in production", () => {
     expect(() => parseEnvironment({ ...base, APP_ENV: "production" })).toThrow();
   });
+  it("rejects short production HMAC keys", () => {
+    expect(() => parseEnvironment({
+      ...base,
+      APP_ENV: "production",
+      IDENTITY_ISSUER_URL: "https://auth.hubzero.in",
+      SESSION_HMAC_KEY_BASE64: Buffer.from("short").toString("base64"),
+      RATE_LIMIT_HMAC_KEY_BASE64: Buffer.alloc(32).toString("base64"),
+      OIDC_SIGNING_KEYSET_JSON: "{}",
+    })).toThrow(/32 bytes/);
+  });
 });
