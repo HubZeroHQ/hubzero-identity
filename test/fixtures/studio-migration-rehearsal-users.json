@@ -1,0 +1,18 @@
+[
+  {
+    "studioUserId": "507f1f77bcf86cd799439011",
+    "name": "Synthetic Studio Admin",
+    "email": "synthetic-admin@example.invalid",
+    "role": "headAdmin",
+    "disabled": false,
+    "mustChangePassword": false
+  },
+  {
+    "studioUserId": "507f1f77bcf86cd799439012",
+    "name": "Synthetic Studio Member",
+    "email": "synthetic-member@example.invalid",
+    "role": "member",
+    "disabled": true,
+    "mustChangePassword": true
+  }
+]

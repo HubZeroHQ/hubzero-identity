@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
-import { exportJWK, generateKeyPair, createRemoteJWKSet, jwtVerify, type JWK } from "jose";
+import { exportJWK, generateKeyPair, createRemoteJWKSet, importJWK, jwtVerify, SignJWT, decodeProtectedHeader, type JWK } from "jose";
 import { chromium, expect, type Browser, type Page } from "@playwright/test";
 import { ObjectId, type Db, type MongoClient } from "mongodb";
 import { afterAll, beforeAll, describe, expect as vitestExpect, it } from "vitest";
@@ -22,7 +22,7 @@ const databaseName = `hubzero_identity_oidc_e2e_${Date.now()}`;
 
 describe("HubZero Identity OIDC provider and first-party SSO", () => {
   let mongo: MongoTestInstance; let database: Db; let client: MongoClient; let providerServer: ChildProcess; let browser: Browser;
-  let issuer: string; let clientA: TestClient; let clientB: TestClient; let subject: IdentitySubject;
+  let issuer: string; let clientA: TestClient; let clientB: TestClient; let subject: IdentitySubject; let retiredSigningKey: JWK;
 
   beforeAll(async () => {
     mongo = await startMongoReplicaSet(); client = mongo.client; database = client.db(databaseName); await applyIdentityIndexes(database);
@@ -40,13 +40,15 @@ describe("HubZero Identity OIDC provider and first-party SSO", () => {
     const provisioning = new ProvisioningService(database, client, credentials, events); const actor = generateIdentitySubject();
     const provisioned = await provisioning.provision({ name: "OIDC Test User", email: "oidc-user@e2e.invalid", password, accountType: "internal", mustChangePassword: false, applicationIds: ["oidc-test-a" as never, "oidc-test-b" as never], idempotencyKey: "oidc-e2e-provision-key-0001", actorSubject: actor, reason: "isolated OIDC browser fixture" });
     subject = provisioned.subject;
+    const retiredPrivateKey = await exportJWK(await generateKeyPair("ES256", { extractable: true }).then((pair) => pair.privateKey));
+    retiredSigningKey = { ...retiredPrivateKey, kid: "test-es256-retired", alg: "ES256", use: "sig" };
     const privateKey = await exportJWK(await generateKeyPair("ES256", { extractable: true }).then((pair) => pair.privateKey));
     const signingKey: JWK = { ...privateKey, kid: "test-es256-2026", alg: "ES256", use: "sig" };
     providerServer = spawn(process.execPath, [resolve("node_modules/tsx/dist/cli.mjs"), "server.ts"], {
       cwd: process.cwd(), windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: {
         ...process.env, PORT: String(authPort), APP_ENV: "test", IDENTITY_ISSUER_URL: issuer, MONGODB_URI: mongoUriWithDatabase(mongo.uri, databaseName), MONGODB_DATABASE: databaseName,
         SESSION_HMAC_KEY_BASE64: randomBytes(32).toString("base64"), RATE_LIMIT_HMAC_KEY_BASE64: randomBytes(32).toString("base64"), OIDC_ADAPTER_HMAC_KEY_BASE64: randomBytes(32).toString("base64"),
-        OIDC_PROVIDER_ENABLED: "true", OIDC_SIGNING_KEYSET_JSON: JSON.stringify({ keys: [signingKey] }), OIDC_CLIENT_SECRETS_JSON: JSON.stringify({ "oidc-test-a-secret": aSecret, "oidc-test-b-secret": bSecret }),
+        OIDC_PROVIDER_ENABLED: "true", OIDC_SIGNING_KEYSET_JSON: JSON.stringify({ keys: [retiredSigningKey, signingKey] }), OIDC_SIGNING_ACTIVE_KID: "test-es256-2026", OIDC_CLIENT_SECRETS_JSON: JSON.stringify({ "oidc-test-a-secret": aSecret, "oidc-test-b-secret": bSecret }),
       },
     });
     await waitFor(`${issuer}/health/oidc`, providerServer); browser = await chromium.launch({ headless: true });
@@ -63,7 +65,16 @@ describe("HubZero Identity OIDC provider and first-party SSO", () => {
     vitestExpect(discovery.issuer).toBe(issuer); vitestExpect(discovery.authorization_endpoint).toBe(`${issuer}/authorize`); vitestExpect(discovery.token_endpoint).toBe(`${issuer}/token`);
     vitestExpect(discovery.code_challenge_methods_supported).toEqual(["S256"]); vitestExpect(discovery.scopes_supported).toEqual(vitestExpect.arrayContaining(["openid", "profile", "email"]));
     const jwks = await fetch(`${issuer}/jwks`).then((response) => response.json() as Promise<{ keys: Array<Record<string, unknown>> }>);
-    vitestExpect(jwks.keys).toHaveLength(1); vitestExpect(jwks.keys[0].kid).toBe("test-es256-2026"); vitestExpect(jwks.keys[0]).not.toHaveProperty("d");
+    vitestExpect(jwks.keys.map((key) => key.kid)).toEqual(["test-es256-2026", "test-es256-retired"]);
+    vitestExpect(jwks.keys.every((key) => !("d" in key))).toBe(true);
+    const retiredToken = await new SignJWT({ sub: "hz_01HZXQX7M9C3A7F0H5K2N8P4R6" })
+      .setProtectedHeader({ alg: "ES256", kid: "test-es256-retired" })
+      .setIssuer(issuer)
+      .setAudience("oidc-test-client-a")
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(await importJWK(retiredSigningKey, "ES256"));
+    await vitestExpect(jwtVerify(retiredToken, createRemoteJWKSet(new URL(`${issuer}/jwks`)), { issuer, audience: "oidc-test-client-a" })).resolves.toBeTruthy();
   });
 
   it("authenticates Client A, validates tokens, and reuses SSO for Client B", async () => {
@@ -75,7 +86,7 @@ describe("HubZero Identity OIDC provider and first-party SSO", () => {
     await expect(page).toHaveURL(clientA.origin); await expect(page.getByText(`Subject: ${subject}`)).toBeVisible();
     await page.goto(clientB.origin); await page.getByRole("link", { name: "Continue with HubZero" }).click();
     await expect(page).toHaveURL(clientB.origin); await expect(page.getByText(`Subject: ${subject}`)).toBeVisible();
-    vitestExpect(clientA.lastClaims?.sub).toBe(subject); vitestExpect(clientA.lastClaims?.iss).toBe(issuer); vitestExpect(clientB.lastClaims?.aud).toBe("oidc-test-client-b");
+    vitestExpect(clientA.lastClaims?.sub).toBe(subject); vitestExpect(clientA.lastClaims?.iss).toBe(issuer); vitestExpect(clientB.lastClaims?.aud).toBe("oidc-test-client-b"); vitestExpect(clientA.lastIdTokenKid).toBe("test-es256-2026");
     await context.close();
   });
 
@@ -103,9 +114,9 @@ function application(id: string, clientId: string, displayName: string, redirect
   return { _id: new ObjectId(), id: id as never, slug: id, displayName, description: "Isolated OIDC relying-party fixture", clientId, clientType: "confidential_web" as const, clientSecretReference: secretReference, visibility: "internal" as const, redirectUris: [redirectUri], postLogoutRedirectUris: [], firstParty: true, enabled: true, brand: { homeUrl: redirectUri.slice(0, redirectUri.lastIndexOf("/")) }, createdAt: now, updatedAt: now };
 }
 
-interface TestClient { origin: string; close(): Promise<void>; lastClaims: Record<string, unknown> | null; replayLastCode(): Promise<Response> }
+interface TestClient { origin: string; close(): Promise<void>; lastClaims: Record<string, unknown> | null; lastIdTokenKid: string | null; replayLastCode(): Promise<Response> }
 async function startTestClient(input: { host: string; port: number; issuer: string; clientId: string; clientSecret: string; cookieName: string }): Promise<TestClient> {
-  const flows = new Map<string, { state: string; nonce: string; verifier: string }>(); const sessions = new Map<string, Record<string, unknown>>(); let lastCode: string | null = null; let lastVerifier: string | null = null; let lastClaims: Record<string, unknown> | null = null;
+  const flows = new Map<string, { state: string; nonce: string; verifier: string }>(); const sessions = new Map<string, Record<string, unknown>>(); let lastCode: string | null = null; let lastVerifier: string | null = null; let lastClaims: Record<string, unknown> | null = null; let lastIdTokenKid: string | null = null;
   const origin = `http://${input.host}:${input.port}`;
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", origin); const flowId = cookie(request.headers.cookie, `${input.cookieName}_flow`); const sessionId = cookie(request.headers.cookie, input.cookieName);
@@ -119,7 +130,7 @@ async function startTestClient(input: { host: string; port: number; issuer: stri
       const flow = flowId ? flows.get(flowId) : undefined; const code = url.searchParams.get("code");
       if (!flow || !code || url.searchParams.get("state") !== flow.state) return reply(response, 400, "Callback rejected");
       const tokenResponse = await exchange(input, code, flow.verifier); if (!tokenResponse.ok) return reply(response, 400, "Token exchange rejected");
-      const tokens = await tokenResponse.json() as { id_token: string }; const verified = await jwtVerify(tokens.id_token, createRemoteJWKSet(new URL(`${input.issuer}/jwks`)), { issuer: input.issuer, audience: input.clientId });
+      const tokens = await tokenResponse.json() as { id_token: string }; lastIdTokenKid = decodeProtectedHeader(tokens.id_token).kid ?? null; const verified = await jwtVerify(tokens.id_token, createRemoteJWKSet(new URL(`${input.issuer}/jwks`)), { issuer: input.issuer, audience: input.clientId });
       if (verified.payload.nonce !== flow.nonce) return reply(response, 400, "Nonce rejected");
       const id = randomBytes(24).toString("base64url"); lastCode = code; lastVerifier = flow.verifier; lastClaims = verified.payload as Record<string, unknown>; sessions.set(id, { issuer: input.issuer, sub: verified.payload.sub, name: verified.payload.name, email: verified.payload.email });
       response.setHeader("Set-Cookie", `${input.cookieName}=${id}; HttpOnly; SameSite=Lax; Path=/`); response.statusCode = 303; response.setHeader("Location", "/"); return response.end();
@@ -129,7 +140,7 @@ async function startTestClient(input: { host: string; port: number; issuer: stri
     reply(response, 200, session ? `<main><h1>Signed in</h1><p>Subject: ${String(session.sub)}</p><p>${String(session.name ?? "")}</p><a href="/logout">Sign out of this test client</a><a href="/start?prompt=login">Authenticate with HubZero again</a></main>` : "<main><h1>Not signed in</h1><a href=\"/start\">Continue with HubZero</a></main>", "text/html");
   });
   await new Promise<void>((resolvePromise, reject) => server.listen(input.port, "0.0.0.0", () => resolvePromise()).on("error", reject));
-  return { origin, get lastClaims() { return lastClaims; }, replayLastCode: () => { if (!lastCode || !lastVerifier) throw new Error("No code was exchanged"); return exchange(input, lastCode, lastVerifier); }, close: () => new Promise((resolvePromise, reject) => server.close((error) => error ? reject(error) : resolvePromise())) };
+  return { origin, get lastClaims() { return lastClaims; }, get lastIdTokenKid() { return lastIdTokenKid; }, replayLastCode: () => { if (!lastCode || !lastVerifier) throw new Error("No code was exchanged"); return exchange(input, lastCode, lastVerifier); }, close: () => new Promise((resolvePromise, reject) => server.close((error) => error ? reject(error) : resolvePromise())) };
 }
 
 function exchange(input: { issuer: string; clientId: string; clientSecret: string; host: string; port: number }, code: string, verifier: string) {

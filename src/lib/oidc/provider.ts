@@ -22,7 +22,7 @@ export async function createOidcProvider(environment: Environment): Promise<Oidc
   if (!environment.OIDC_PROVIDER_ENABLED) throw new Error("OIDC provider is disabled by configuration");
   const runtime = await createIdentityRuntime(environment);
   const clients = await loadClients(runtime, environment);
-  const jwks = parseSigningKeySet(environment.OIDC_SIGNING_KEYSET_JSON!);
+  const jwks = parseSigningKeySet(environment.OIDC_SIGNING_KEYSET_JSON!, environment.OIDC_SIGNING_ACTIVE_KID!);
   const cookieKey = decodeRequiredBase64Key(environment.SESSION_HMAC_KEY_BASE64!, "SESSION_HMAC_KEY_BASE64");
   const configuration: Configuration = {
     adapter: createMongoOidcAdapter(runtime.database, decodeRequiredBase64Key(environment.OIDC_ADAPTER_HMAC_KEY_BASE64!, "OIDC_ADAPTER_HMAC_KEY_BASE64")),
@@ -104,15 +104,21 @@ async function loadClients(runtime: IdentityRuntime, environment: Environment): 
   });
 }
 
-function parseSigningKeySet(value: string): { keys: JWK[] } {
+/**
+ * `oidc-provider` selects the first matching signing key. Make that operation
+ * explicit: the non-secret active `kid` names the only private key used for
+ * new tokens, while older public keys can remain in JWKS for verification.
+ */
+export function parseSigningKeySet(value: string, activeKid: string): { keys: JWK[] } {
   let parsed: unknown;
   try { parsed = JSON.parse(value); } catch { throw new Error("OIDC_SIGNING_KEYSET_JSON must contain JSON"); }
   if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { keys?: unknown }).keys)) throw new Error("OIDC_SIGNING_KEYSET_JSON must be a JWK set");
   const keys = (parsed as { keys: JWK[] }).keys;
-  if (!keys.some((key) => key.kty === "EC" && key.crv === "P-256" && key.d && key.kid && key.alg === "ES256")) {
-    throw new Error("OIDC signing key set requires an active private ES256 P-256 JWK with kid");
+  const active = keys.find((key) => key.kid === activeKid);
+  if (!active || active.kty !== "EC" || active.crv !== "P-256" || !active.d || active.alg !== "ES256" || active.use !== "sig") {
+    throw new Error("OIDC signing key set requires OIDC_SIGNING_ACTIVE_KID to select a private ES256 P-256 signing JWK");
   }
-  return { keys };
+  return { keys: [active, ...keys.filter((key) => key !== active)] };
 }
 
 function parseClientSecrets(value: string): Record<string, string> {

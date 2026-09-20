@@ -15,6 +15,8 @@ export const environmentSchema = z
     EMAIL_FROM: z.string().email().optional(),
     EMAIL_PROVIDER_API_KEY: optionalSecret,
     OIDC_SIGNING_KEYSET_JSON: optionalSecret,
+    /** Non-secret `kid` selecting the only key permitted to sign new ID tokens. */
+    OIDC_SIGNING_ACTIVE_KID: z.string().min(1).max(256).optional(),
     OIDC_PROVIDER_ENABLED: booleanFlag,
     OIDC_ADAPTER_HMAC_KEY_BASE64: optionalSecret,
     /** JSON object mapping an Identity-owned secret reference to a client secret. */
@@ -40,6 +42,11 @@ export const environmentSchema = z
     return { ...environment, MONGODB_DATABASE: environment.MONGODB_DATABASE ?? uriDatabase };
   })
   .superRefine((environment, context) => {
+    if (environment.OIDC_PROVIDER_ENABLED) {
+      for (const name of ["OIDC_SIGNING_KEYSET_JSON", "OIDC_SIGNING_ACTIVE_KID", "OIDC_ADAPTER_HMAC_KEY_BASE64", "OIDC_CLIENT_SECRETS_JSON"] as const) {
+        if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required when the OIDC provider is enabled` });
+      }
+    }
     if (environment.APP_ENV !== "production") return;
     if (!environment.IDENTITY_ISSUER_URL.startsWith("https://")) {
       context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must use HTTPS" });
@@ -49,11 +56,6 @@ export const environmentSchema = z
     }
     if (environment.IDENTITY_ISSUER_URL !== "https://auth.hubzero.in") {
       context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must be https://auth.hubzero.in" });
-    }
-    if (environment.OIDC_PROVIDER_ENABLED) {
-      for (const name of ["OIDC_SIGNING_KEYSET_JSON", "OIDC_ADAPTER_HMAC_KEY_BASE64", "OIDC_CLIENT_SECRETS_JSON"] as const) {
-        if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required when the OIDC provider is enabled` });
-      }
     }
     for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64", "OIDC_ADAPTER_HMAC_KEY_BASE64"] as const) {
       const value = environment[name];

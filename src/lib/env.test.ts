@@ -23,4 +23,13 @@ describe("environment validation", () => {
       OIDC_SIGNING_KEYSET_JSON: "{}",
     })).toThrow(/32 bytes/);
   });
+  it("requires an explicit active signing key whenever OIDC is enabled", () => {
+    expect(() => parseEnvironment({
+      ...base,
+      OIDC_PROVIDER_ENABLED: "true",
+      OIDC_SIGNING_KEYSET_JSON: '{"keys":[]}',
+      OIDC_ADAPTER_HMAC_KEY_BASE64: Buffer.alloc(32).toString("base64"),
+      OIDC_CLIENT_SECRETS_JSON: '{}',
+    })).toThrow(/OIDC_SIGNING_ACTIVE_KID/);
+  });
 });

@@ -36,7 +36,8 @@ async function main() {
       if (url.pathname === "/health/oidc" || isProviderRoute(url.pathname) || url.pathname.startsWith("/interaction/")) {
         applyProviderSecurityHeaders(response);
       }
-      if (url.pathname === "/health/oidc") return send(response, oidc ? 200 : 503, oidc ? "ready" : "OIDC provider disabled");
+      if (url.pathname === "/health/live") return send(response, 204, "");
+      if (url.pathname === "/health/oidc" || url.pathname === "/health/ready") return send(response, oidc ? 200 : 503, oidc ? "ready" : "OIDC provider disabled");
       if (oidc && continuationService && url.pathname.startsWith("/interaction/") && request.method === "GET") {
         return beginInteraction(request, response, oidc.provider, oidc.runtime, continuationService, url.pathname.slice("/interaction/".length));
       }
@@ -57,7 +58,18 @@ async function main() {
     }
   });
   server.listen(port, "0.0.0.0", () => console.info(`HubZero Identity listening on port ${port}`));
-  const shutdown = () => server.close(() => process.exit(0));
+  let shuttingDown = false;
+  const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    const forceExit = setTimeout(() => process.exit(1), 10_000);
+    forceExit.unref();
+    server.close(async () => {
+      await oidc?.runtime.client.close().catch(() => undefined);
+      clearTimeout(forceExit);
+      process.exit(0);
+    });
+  };
   process.once("SIGTERM", shutdown); process.once("SIGINT", shutdown);
 }
 
