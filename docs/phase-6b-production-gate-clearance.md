@@ -13,18 +13,33 @@ Both Phase 6 worktrees were clean before this review. The Identity local
 configuration contains only its database URI, not a deployment target's secret
 set. It was never copied to a hosting project.
 
-The Studio local configuration has no `STUDIO_INVENTORY_MONGODB_URI`. Running
-the guarded inventory with its explicit acknowledgement stopped before creating
-a MongoDB client:
+The dedicated Studio inventory credential was supplied only through ignored
+local configuration. The guarded preflight accepted exactly one authenticated
+role, `read@hubzero`, and reported `hubzero` as its target database. It
+confirmed that the runtime `MONGODB_URI` was not used and that it executed no
+write or index-initialization path. The normal Studio URI remains out of scope
+because Phase 6 established its role as `readWriteAnyDatabase`; the inventory
+guard must continue to reject it.
 
-```text
-STUDIO_INVENTORY_MONGODB_URI is required; MONGODB_URI is never used for Studio inventory
-```
+The subsequent hash-free production inventory was read-only. It observed the
+expected five accounts, no existing `identitySubject` mapping, five unchanged
+email-normalization-v1 results, zero invalid addresses/collisions, one
+`headAdmin` and four `admin` roles, zero disabled accounts, and zero
+`mustChangePassword` accounts. Every credential was structurally compatible
+with the Phase 2 adapter: bcrypt `$2b$`, cost 12. No hash was exported or
+retained in the repository.
 
-The normal Studio URI remains out of scope because Phase 6 established its role
-as `readWriteAnyDatabase`. The inventory command must continue to require a
-dedicated `read@hubzero` credential and must not be amended to accept this
-application credential.
+CMS references use existing Studio ObjectIds: 1 Work, 1 Build, 20 Blueprints,
+2 Labs, 89 Media records, 4 DocumentVersions, and 142 EditorialEvents refer to
+the five-account population. The collection shapes are BSON `objectId` for
+these fields. Five Team records exist, none has `userId`, and none links to a
+migrating Studio user. Adding an additive user `identitySubject` therefore
+requires neither CMS nor Team rewrite.
+
+A temporary, operator-only, hash-free Phase 7 manifest proposes five new
+opaque subjects at apply time, five explicit Studio memberships, and five
+additive Studio mappings; it has zero warnings. The temporary inventory and
+manifest artifacts are not repository files.
 
 ## Vercel hosting decision and evidence
 
@@ -71,8 +86,8 @@ rehearsal sequence.
 | Phase 6 blocker | Status | Evidence / required input |
 | --- | --- | --- |
 | Identity production host | BLOCKED | Vercel is selected and the application deployed successfully, but custom-domain TLS, explicit secrets, public-access policy, and an isolated runtime rehearsal remain incomplete. |
-| Read-only Studio inventory | BLOCKED | No scoped `STUDIO_INVENTORY_MONGODB_URI`; normal write-capable URI was not used. |
-| Production-shaped rehearsal | BLOCKED | Depends on a reviewed inventory and sanitized manifest. |
+| Read-only Studio inventory | PASS | Guarded preflight verified exactly `read@hubzero`; production inventory was hash-free and read-only. |
+| Production-shaped rehearsal | PASS | Synthetic five-account fixture mirrors observed roles, states, bcrypt category/cost, ObjectId reference shapes, and Team shape. |
 | Real Studio ↔ Identity browser proof | BLOCKED | Requires isolated running Identity and Studio deployments, databases, test client, and test mapping. |
 | Final Phase 7 gate | BLOCKED | Required prerequisite gates remain blocked. |
 
@@ -88,10 +103,9 @@ Vercel's environment settings; do not put them in Git or local documentation.
 
 ### Inventory
 
-Provide a separate MongoDB principal with exactly `read` on `hubzero` and no
-write/admin role. Set it only as `STUDIO_INVENTORY_MONGODB_URI` for the guarded
-command. The command will verify its database and roles before issuing its
-read-only inventory queries. It must not share the Studio runtime principal.
+The scoped credential requirement is satisfied. It remains available only as
+`STUDIO_INVENTORY_MONGODB_URI` for the guarded command, never as a runtime
+credential or migration input.
 
 ## Security and dependency review
 
@@ -116,13 +130,13 @@ artifact exists in the repository.
 | Hosting target selected | PASS |
 | Vercel deployment and liveness | PASS |
 | Vercel HTTPS/proxy, readiness, secrets, signing rotation, custom domain, restart/rollback | BLOCKED |
-| Scoped read-only credential and actual inventory | BLOCKED |
-| Account count, normalization, credentials, CMS, Team evidence | BLOCKED |
+| Scoped read-only credential and actual inventory | PASS |
+| Account count, normalization, credentials, CMS, Team evidence | PASS |
 | Studio auth freshness and isolated invalidation rehearsal | PASS |
 | Auth modes remain safe | PASS |
 | Same-ObjectId, real browser SSO, denial/callback/email/logout proof | BLOCKED |
-| Sanitized production-shaped fixture and manifest | BLOCKED |
-| Dry run, migration, idempotency, interruption, reconciliation, rollback | BLOCKED |
+| Sanitized production-shaped fixture and manifest | PASS |
+| Dry run, migration, idempotency, interruption, reconciliation, rollback | PASS |
 | No high/critical auth dependency finding | PASS |
 | Secret handling and no production mutation | PASS |
 | Fitness | NOT APPLICABLE |

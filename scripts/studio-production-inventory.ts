@@ -4,7 +4,6 @@ import { MongoClient, ObjectId } from "mongodb";
 import { normalizeEmail } from "@/lib/identity/email";
 
 const SOURCE_DATABASE = "hubzero";
-const READ_ONLY_ROLES = new Set(["read"]);
 const REFERENCE_PATHS = [
   ["work", "createdByUserId"], ["builds", "createdByUserId"], ["blueprints", "createdByUserId"],
   ["labs", "createdByUserId"], ["notes", "createdByUserId"], ["careers", "createdByUserId"],
@@ -34,7 +33,13 @@ function normalize(value: unknown) {
   if (typeof value !== "string") return { valid: false as const };
   try {
     const result = normalizeEmail(value);
-    return { valid: true as const, email: result.email, normalizedEmail: result.normalizedEmail, normalizationVersion: result.version };
+    return {
+      valid: true as const,
+      email: result.email,
+      normalizedEmail: result.normalizedEmail,
+      normalizationVersion: result.version,
+      classification: value === result.normalizedEmail ? "unchanged" as const : "normalized" as const,
+    };
   } catch {
     return { valid: false as const };
   }
@@ -46,6 +51,22 @@ function parseOutput(): string | undefined {
 
 function hasReadOnlyConfirmation(): boolean {
   return process.argv.includes("--confirm-read-only") || process.env.npm_config_confirm_read_only === "true";
+}
+
+function preflightOnly(): boolean {
+  return process.argv.includes("--preflight") || process.env.npm_config_preflight === "true";
+}
+
+function assertScopedReadRole(roles: unknown[]): asserts roles is Array<{ role: "read"; db: typeof SOURCE_DATABASE }> {
+  if (
+    roles.length !== 1
+    || roles[0] === null
+    || typeof roles[0] !== "object"
+    || (roles[0] as { role?: unknown }).role !== "read"
+    || (roles[0] as { db?: unknown }).db !== SOURCE_DATABASE
+  ) {
+    throw new Error("Studio inventory requires exactly one dedicated read@hubzero role; refusing this credential");
+  }
 }
 
 async function main(): Promise<void> {
@@ -64,8 +85,17 @@ async function main(): Promise<void> {
     await client.connect();
     const status = await client.db("admin").command({ connectionStatus: 1, showPrivileges: false });
     const roles = status.authInfo?.authenticatedUserRoles ?? [];
-    if (!roles.length || !roles.every((role: { role?: string; db?: string }) => role.db === SOURCE_DATABASE && READ_ONLY_ROLES.has(role.role ?? ""))) {
-      throw new Error("Studio inventory requires a dedicated read-only role scoped to hubzero; refusing this credential");
+    assertScopedReadRole(roles);
+    const safety = {
+      sourceDatabase: SOURCE_DATABASE,
+      authenticatedRoles: roles.map((role) => `${role.role}@${role.db}`),
+      runtimeMongoUriUsed: false,
+      mutationPathsExecuted: false,
+      indexInitializationExecuted: false,
+    };
+    if (preflightOnly()) {
+      process.stdout.write(`${JSON.stringify({ mode: "read-only-preflight", ...safety })}\n`);
+      return;
     }
 
     const database = client.db(SOURCE_DATABASE);
@@ -74,7 +104,7 @@ async function main(): Promise<void> {
       const email = normalize(user.email);
       const references = Object.fromEntries(await Promise.all(REFERENCE_PATHS.map(async ([collection, field]) => [
         `${collection}.${field}`,
-        await database.collection(collection).countDocuments({ [field]: user._id }),
+        await database.collection(collection).countDocuments({ [field]: { $in: [user._id, user._id.toHexString()] } }),
       ])));
       return {
         studioUserId: user._id.toHexString(),
@@ -91,6 +121,20 @@ async function main(): Promise<void> {
     const normalized = new Map<string, string[]>();
     for (const record of records) if (record.email.valid) normalized.set(record.email.normalizedEmail, [...(normalized.get(record.email.normalizedEmail) ?? []), record.studioUserId]);
     const collisions = [...normalized.entries()].filter(([, ids]) => ids.length > 1).map(([normalizedEmail, studioUserIds]) => ({ normalizedEmail, studioUserIds }));
+    const referenceShapes = Object.fromEntries(await Promise.all(REFERENCE_PATHS.map(async ([collection, field]) => {
+      const values = await database.collection(collection).aggregate<{ _id: string; count: number }>([
+        { $match: { [field]: { $exists: true } } },
+        { $group: { _id: { $type: `$${field}` }, count: { $sum: 1 } } },
+      ]).toArray();
+      return [`${collection}.${field}`, Object.fromEntries(values.map((value) => [value._id, value.count]))];
+    })));
+    const teamUserIdTypes = referenceShapes["team.userId"] as Record<string, number>;
+    const team = {
+      documentCount: await database.collection("team").countDocuments({}),
+      linkedUserCount: await database.collection("team").countDocuments({ userId: { $exists: true } }),
+      linkedUserIdTypes: teamUserIdTypes,
+      linksToMigratedUsers: records.reduce((count, record) => count + (record.references["team.userId"] ?? 0), 0),
+    };
     const manifest = {
       schemaVersion: 1,
       mode: "read-only-inventory",
@@ -100,6 +144,8 @@ async function main(): Promise<void> {
       observedAccountCount: records.length,
       normalizationVersion: 1,
       collisions,
+      referenceShapes,
+      team,
       records,
     };
     const output = parseOutput();
@@ -108,7 +154,7 @@ async function main(): Promise<void> {
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
     }
-    process.stdout.write(`${JSON.stringify({ mode: manifest.mode, sourceDatabase: SOURCE_DATABASE, observedAccountCount: records.length, expectedAccountCount: 5, collisionCount: collisions.length, invalidEmailCount: records.filter((record) => !record.email.valid).length, credentialAlgorithms: records.reduce<Record<string, number>>((counts, record) => ({ ...counts, [record.credential.algorithm]: (counts[record.credential.algorithm] ?? 0) + 1 }), {}), outputWritten: Boolean(output) })}\n`);
+    process.stdout.write(`${JSON.stringify({ mode: manifest.mode, ...safety, observedAccountCount: records.length, expectedAccountCount: 5, normalization: { unchanged: records.filter((record) => record.email.valid && record.email.classification === "unchanged").length, normalized: records.filter((record) => record.email.valid && record.email.classification === "normalized").length, invalid: records.filter((record) => !record.email.valid).length, collisions: collisions.length }, credentialAlgorithms: records.reduce<Record<string, number>>((counts, record) => ({ ...counts, [record.credential.algorithm]: (counts[record.credential.algorithm] ?? 0) + 1 }), {}), outputWritten: Boolean(output) })}\n`);
   } finally {
     await client.close();
   }

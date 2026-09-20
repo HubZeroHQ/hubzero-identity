@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": "synthetic production-shaped fixture; contains no production identities, emails, or hashes",
+  "accounts": [
+    { "studioUserId": "507f1f77bcf86cd799439011", "name": "Synthetic Studio Head Admin", "email": "synthetic-head-admin@example.invalid", "role": "headAdmin", "disabled": false, "mustChangePassword": false },
+    { "studioUserId": "507f1f77bcf86cd799439012", "name": "Synthetic Studio Admin One", "email": "synthetic-admin-one@example.invalid", "role": "admin", "disabled": false, "mustChangePassword": false },
+    { "studioUserId": "507f1f77bcf86cd799439013", "name": "Synthetic Studio Admin Two", "email": "synthetic-admin-two@example.invalid", "role": "admin", "disabled": false, "mustChangePassword": false },
+    { "studioUserId": "507f1f77bcf86cd799439014", "name": "Synthetic Studio Admin Three", "email": "synthetic-admin-three@example.invalid", "role": "admin", "disabled": false, "mustChangePassword": false },
+    { "studioUserId": "507f1f77bcf86cd799439015", "name": "Synthetic Studio Admin Four", "email": "synthetic-admin-four@example.invalid", "role": "admin", "disabled": false, "mustChangePassword": false }
+  ],
+  "credentialShape": { "algorithm": "bcrypt", "variant": "2b", "cost": 12 },
+  "referenceShape": {
+    "work.createdByUserId": 1,
+    "builds.createdByUserId": 1,
+    "blueprints.createdByUserId": 20,
+    "labs.createdByUserId": 2,
+    "media.createdByUserId": 95,
+    "documentVersions.createdByUserId": 8,
+    "editorialEvents.actorUserId": 142,
+    "engineeringProfiles.createdByUserId": 5,
+    "team": { "documentCount": 5, "linkedUserCount": 0 }
+  }
+}
