@@ -14,11 +14,29 @@ HubZero Identity already ships a Next.js 16 App Router account application. OIDC
 
 ## Decision
 
-Use a small custom Node entry (`server.ts`) that prepares Next and routes protocol endpoints to `oidc-provider`. Next handles Account UI, sign-in, and the Identity-owned interaction page. The provider owns standard protocol parsing, PKCE, codes, tokens, discovery, and JWKS; the entry point performs only host/session/membership prechecks and delegates the provider callback.
+Use a small Node-native provider bridge that prepares no independent protocol
+state and routes protocol endpoints to `oidc-provider`. Next handles Account UI,
+sign-in, and the Identity-owned interaction page. The provider owns standard
+protocol parsing, PKCE, codes, tokens, discovery, and JWKS; the bridge performs
+only host/session/membership prechecks and delegates the provider callback.
 
-The deployment must run the Node runtime, preserve the canonical host, and provide the same dedicated MongoDB database to both components. `next start` remains available conceptually as a rollback shape, but Phase 4's `dev`/`start` scripts use the custom entry. Next standalone output is not used because it cannot trace a custom server entry; the lost automatic static optimization is acceptable for this private, dynamically rendered authentication surface.
+`server.ts` remains the portable Node/Docker adapter: it prepares Next and
+passes eligible requests to that bridge. The Vercel adapter internally rewrites
+canonical protocol paths to a Node Function that passes the same request shape
+to the same bridge. It does not run a custom listener on Vercel. This preserves
+one issuer and prevents the deployment platform from becoming part of protocol
+correctness.
+
+The deployment must run the Node runtime, preserve the canonical host, and
+provide the same dedicated MongoDB database to both components. The portable
+Node/Docker shape builds `dist/server.mjs`; the Vercel shape uses the standard
+Next build plus the explicit internal protocol rewrites. Next standalone output
+is not used because it cannot trace the portable custom server entry.
+
+ADR 0016 selects Vercel as the primary host and records its operational
+constraints. This ADR continues to define the provider bridge, not the hosting
+decision.
 
 ## Consequences
 
 Development/test enable the provider explicitly and use isolated issuers, keys, clients, and databases. Production remains disabled until signing keys, client secret references, indexes, and applications are initialized through an approved rollout. Health readiness reports provider availability without exposing configuration. A future separate provider process remains possible behind a trusted deployment proxy, but is not required to prove Phase 4.
-

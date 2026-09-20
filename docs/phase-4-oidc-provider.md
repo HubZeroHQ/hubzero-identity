@@ -4,7 +4,12 @@ Phase 4 adds the first standards-based SSO layer without modifying Studio or Fit
 
 ## Topology
 
-`server.ts` is the Node entry point. It prepares Next, sends `/authorize`, `/token`, `/jwks`, discovery, resume, and provider-owned routes to `oidc-provider`, and delegates Account UI plus `/interaction/:uid` to Next/Identity-owned handlers. The provider is enabled only when `OIDC_PROVIDER_ENABLED=true`. Production initialization is intentionally not performed by tests or application startup.
+`server.ts` is the portable Node/Docker entry point. It prepares Next and sends
+the OIDC bridge its protocol routes; Vercel's Node Function adapter now invokes
+the same bridge through internal rewrites. Account UI and
+`/authorize/interaction` remain Next/Identity-owned handlers. The provider is
+enabled only when `OIDC_PROVIDER_ENABLED=true`. Production initialization is
+intentionally not performed by tests or application startup.
 
 Provider-owned responses receive restrictive protocol headers and canonical-host checks. Native form navigations that Chromium reports with `Origin: null` are normalized only after the request host matches the configured Identity origin, allowing Next Server Actions to retain their own same-origin validation without accepting arbitrary forwarded origins.
 

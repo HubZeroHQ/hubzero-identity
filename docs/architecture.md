@@ -12,7 +12,15 @@ Products must not read Identity collections, share cookies, receive password has
 
 ## Deployment shape
 
-One Node.js deployable owns the Next.js App Router UI and identity domain modules. MongoDB is the durable store. Phase 4 selected a small custom Node entry (`server.ts`) that mounts maintained `oidc-provider` and delegates all non-protocol requests to Next. This preserves one canonical origin and release lifecycle while accepting the documented custom-server trade-off that Next standalone tracing and some automatic static optimization are unavailable. A separate provider process behind trusted deployment routing remains a future operational option; OAuth/OIDC is never hand-rolled.
+One deployable owns the Next.js App Router UI and identity domain modules.
+MongoDB is the durable store. `oidc-provider` remains the maintained protocol
+implementation; a small Node-native bridge handles only protocol delegation,
+Identity-session/membership prechecks, and interactions. The portable
+`server.ts` starts that bridge beside Next for development and Docker fallback.
+On Vercel, canonical protocol paths are internally rewritten to a Node Function
+that invokes the exact same bridge; the browser still sees only one canonical
+origin. This avoids making a process listener, sticky routing, or custom-server
+tracing a Vercel production requirement. OAuth/OIDC is never hand-rolled.
 
 There is no Edge runtime for password, session, MongoDB, or provider code.
 
@@ -79,7 +87,15 @@ The Phase 4 provider currently enables only discovery, JWKS, Authorization Code,
 
 ## Environments
 
-Localhost, preview/staging, and production use different issuers, databases, signing keys, cookie namespaces where required, and explicit client records. Preview callbacks are registered exactly; no wildcard hostnames. Production secrets come from the deployment secret manager and are validated before serving traffic. Development conveniences may never silently weaken production settings. The OIDC signing keyset names one active private ES256 key by non-secret `OIDC_SIGNING_ACTIVE_KID`; previous public keys remain published only through their verification overlap.
+Localhost, isolated test environments, and production use different issuers,
+databases, signing keys, cookie namespaces where required, and explicit client
+records. Vercel Preview deployments keep OIDC disabled: arbitrary preview URLs
+are never issuers or registered callbacks. Production secrets come from the
+deployment secret manager and are validated before serving traffic. Development
+conveniences may never silently weaken production settings. The OIDC signing
+keyset names one active private ES256 key by non-secret
+`OIDC_SIGNING_ACTIVE_KID`; previous public keys remain published only through
+their verification overlap.
 
 ## Ownership map
 

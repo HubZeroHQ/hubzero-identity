@@ -19,6 +19,14 @@ Phase 3 adds a real Chromium browser suite. It starts a production-mode local Ne
 
 Phase 4 adds an isolated OIDC browser suite. It starts the custom Node/Next provider with a per-run replica-set database, generated ES256 test key, fake internal account, and two confidential clients on separate loopback origins. It validates discovery/JWKS, exact callbacks, S256 PKCE, state/nonce, one-time code exchange/replay, membership denial, prompt-none, and SSO while each test client creates its own session. It never reads `.env.local`, initializes production OIDC collections, registers production clients, or contacts the legacy `hubzero` database.
 
+Phase 6B adds a Vercel Build Output verification. `npx vercel build` must
+produce Node.js 22 functions for every explicit OIDC adapter and preserve the
+canonical rewrite table for discovery, authorization, token, JWKS, interaction,
+resume, and health paths. This is a build-shape check, not a deployment proof;
+the isolated browser suite continues to exercise the same Node-native bridge
+and Mongo persistence. See [`vercel-deployment.md`](vercel-deployment.md) for
+the required authorized-platform rehearsal.
+
 ## Operational checks
 
 Each release verifies install reproducibility, lint, types, tests, production build, secret scan, dependency audit, index plan, migration dry-run, backup/restore posture, and staging smoke tests. Authentication material is synthetic. No CI job receives production database access.

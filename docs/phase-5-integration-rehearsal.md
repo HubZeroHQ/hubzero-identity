@@ -4,7 +4,7 @@ Status: implementation and rehearsal only · 2026-09-20
 
 ## Identity deployment
 
-Identity keeps the accepted custom Node topology: `server.ts` prepares Next.js,
+Identity retains a portable custom Node topology: `server.ts` prepares Next.js,
 mounts `oidc-provider`, and delegates Account UI, RSC, and static assets to Next.
 The new `Dockerfile` is the deployable rehearsal shape. Its build stage compiles
 the custom entry with esbuild; the runtime starts that compiled Node artifact,
@@ -14,8 +14,10 @@ at `/health/ready` and `/health/oidc`. SIGTERM/SIGINT stop the listener, allow a
 bounded ten-second drain, close MongoDB, and exit.
 
 No Identity hosting target is represented in this repository. Phase 6 is blocked
-until a target that supports a long-lived Node/Docker process is selected and
-rehearsed; Vercel's custom-server-incompatible deployment model is not suitable.
+until a target is selected and rehearsed. Phase 6B added a Vercel Node Function
+adapter for the same OIDC bridge, so the previous conclusion that Vercel was
+unsuitable solely because it does not run the custom listener is superseded.
+Vercel is still not selected until an authorized deployment rehearsal passes.
 Its TLS proxy must preserve `Host: auth.hubzero.in`, route protocol/UI/static/RSC
 paths to the same process, and never let forwarded headers determine the issuer.
 
