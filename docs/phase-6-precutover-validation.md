@@ -4,6 +4,9 @@ Status: **NO-GO** · 2026-09-20. This is an evidence record, not a migration
 approval. No Studio user, credential, mapping, session, role, CMS reference, or
 Identity account was changed while producing it.
 
+Phase 6B reconfirmed these blockers without weakening a control or opening a
+Studio collection; see `phase-6b-production-gate-clearance.md`.
+
 ## Hosting decision
 
 The repository contains a Docker-ready, long-lived Node service, but no HubZero
