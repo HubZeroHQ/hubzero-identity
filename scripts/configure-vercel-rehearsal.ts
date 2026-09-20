@@ -11,6 +11,10 @@ if (new URL(rehearsalUri).pathname.replace(/^\/+/, "") !== "hubzero_identity_reh
 const signingKey = await exportJWK((await generateKeyPair("ES256", { extractable: true })).privateKey);
 Object.assign(signingKey, { kid: "phase-6b-rehearsal-a", alg: "ES256", use: "sig" });
 
+const password = process.env.REHEARSAL_TEST_PASSWORD ?? randomBytes(32).toString("base64url");
+const clientSecret = process.env.REHEARSAL_CLIENT_SECRET ?? randomBytes(48).toString("base64url");
+if (password.length < 16 || clientSecret.length < 32) throw new Error("Supplied rehearsal credential material is too short");
+
 const deploymentEnvironment = {
   APP_ENV: "test",
   IDENTITY_ISSUER_URL: "https://hubzero-identity.vercel.app",
@@ -21,9 +25,8 @@ const deploymentEnvironment = {
   OIDC_ADAPTER_HMAC_KEY_BASE64: randomBytes(32).toString("base64"),
   OIDC_SIGNING_KEYSET_JSON: JSON.stringify({ keys: [signingKey] }),
   OIDC_SIGNING_ACTIVE_KID: "phase-6b-rehearsal-a",
-  OIDC_CLIENT_SECRETS_JSON: JSON.stringify({ "studio-rehearsal": randomBytes(48).toString("base64url") }),
+  OIDC_CLIENT_SECRETS_JSON: JSON.stringify({ "studio-rehearsal": clientSecret }),
 };
-const password = randomBytes(32).toString("base64url");
 
 await Promise.all(Object.entries(deploymentEnvironment).map(async ([name, value]) => {
   const outcome = await run("npx", ["vercel", "env", "add", name, "production", "--sensitive", "--force", "--yes", "--scope", "rifaques-projects"], value);
@@ -34,6 +37,7 @@ const setup = await run("npx", ["tsx", "scripts/setup-vercel-rehearsal.ts"], und
   ...process.env,
   ...deploymentEnvironment,
   REHEARSAL_TEST_PASSWORD: password,
+  REHEARSAL_TEST_EMAIL: process.env.REHEARSAL_TEST_EMAIL ?? "vercel-rehearsal@example.invalid",
   REHEARSAL_IDEMPOTENCY_KEY: "phase-6b-vercel-rehearsal-user-0001",
 });
 if (setup.exitCode !== 0) throw new Error("Unable to provision the isolated rehearsal identity");
