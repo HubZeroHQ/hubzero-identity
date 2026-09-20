@@ -1,5 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createRequire } from "node:module";
-const { handleVercelOidcRoute } = createRequire(import.meta.url)("../../../dist/vercel-oidc/adapter.cjs") as { handleVercelOidcRoute(request: IncomingMessage, response: ServerResponse, pathname: string): Promise<void> };
+// Keep the full native credential closure in the readiness function. The
+// handler validates it through PasswordService before reporting healthy.
+import "argon2";
+import "bcrypt";
+import { handleVercelOidcRoute } from "../_adapter.cjs";
 const handler = (request: IncomingMessage, response: ServerResponse) => handleVercelOidcRoute(request, response, "/health/ready");
 export default handler;

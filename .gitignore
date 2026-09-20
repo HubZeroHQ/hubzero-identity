@@ -5,6 +5,8 @@
 /.next/
 /out/
 /dist/
+/api/oidc/_adapter.cjs
+/api/oidc/_adapter.cjs.map
 
 # production
 /build

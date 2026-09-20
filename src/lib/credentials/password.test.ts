@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { describe, expect, it } from "vitest";
+import { loadNativePasswordModules } from "./native-password-modules";
 import { PasswordService, CredentialFormatError, currentArgon2idParameters, parseBcryptHash } from "./password";
 
 describe("password service", () => {
@@ -26,6 +27,28 @@ describe("password service", () => {
   it("can upgrade a verified short legacy password without applying the new-password minimum", async () => {
     const hash = await service.hashLegacyPasswordForUpgrade("oldpass");
     await expect(service.verify({ algorithm: "argon2id", algorithmParameters: currentArgon2idParameters, passwordHash: hash }, "oldpass")).resolves.toMatchObject({ valid: true });
+  });
+
+  it("does not initialize native password modules until a credential operation needs them", async () => {
+    let loads = 0;
+    const service = PasswordService.createForTesting(currentArgon2idParameters, async () => {
+      loads += 1;
+      return loadNativePasswordModules();
+    });
+    expect(loads).toBe(0);
+    const hash = await service.hash("correct horse battery staple");
+    expect(loads).toBe(1);
+    await expect(service.verify({ algorithm: "argon2id", algorithmParameters: currentArgon2idParameters, passwordHash: hash }, "correct horse battery staple")).resolves.toMatchObject({ valid: true });
+  });
+
+  it("uses the same native loader for readiness without hashing a password", async () => {
+    let loads = 0;
+    const service = PasswordService.createForTesting(currentArgon2idParameters, async () => {
+      loads += 1;
+      return loadNativePasswordModules();
+    });
+    await service.assertRuntimeAvailable();
+    expect(loads).toBe(1);
   });
 
   it("rejects malformed or inconsistent credential metadata", async () => {

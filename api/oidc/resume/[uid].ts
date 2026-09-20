@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createRequire } from "node:module";
-const { handleVercelOidcRoute } = createRequire(import.meta.url)("../../../dist/vercel-oidc/adapter.cjs") as { handleVercelOidcRoute(request: IncomingMessage, response: ServerResponse, pathname: string): Promise<void> };
+import { handleVercelOidcRoute } from "../_adapter.cjs";
 const handler = (request: IncomingMessage, response: ServerResponse) => handleVercelOidcRoute(request, response, `/resume/${String((request as IncomingMessage & { query?: { uid?: string } }).query?.uid ?? "")}`);
 export default handler;

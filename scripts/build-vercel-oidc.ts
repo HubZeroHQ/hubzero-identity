@@ -1,13 +1,13 @@
 import { build } from "esbuild";
 
 /**
- * Vercel's legacy Node Function compiler preserves path aliases in helper
- * modules. Bundle the shared OIDC Node adapter first so each tiny API entry
- * has one portable CommonJS dependency with no repository-local imports.
+ * Vercel's Node Function compiler preserves path aliases in helper modules.
+ * Bundle the shared OIDC Node adapter beside its API wrappers so their static
+ * CommonJS require is traced as a normal function-local dependency.
  */
 await build({
   entryPoints: ["src/lib/oidc/vercel-adapter.ts"],
-  outfile: "dist/vercel-oidc/adapter.cjs",
+  outfile: "api/oidc/_adapter.cjs",
   bundle: true,
   platform: "node",
   format: "cjs",

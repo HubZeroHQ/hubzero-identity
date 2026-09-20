@@ -1,7 +1,6 @@
-import * as argon2 from "argon2";
-import bcrypt from "bcrypt";
 import type { Argon2idParameters, BcryptParameters, PasswordCredential } from "@/domain/credentials";
 import { passwordUtf8Length, validatePasswordLength } from "@/domain/credentials";
+import { loadNativePasswordModules, type NativePasswordModules } from "./native-password-modules";
 
 export const currentArgon2idParameters: Readonly<Argon2idParameters> = {
   version: 19,
@@ -35,20 +34,30 @@ export type PasswordVerification =
 export class PasswordService {
   private constructor(
     readonly parameters: Readonly<Argon2idParameters>,
+    private readonly loadNativeModules: () => Promise<NativePasswordModules> = loadNativePasswordModules,
   ) {}
 
   static create(): PasswordService {
     return new PasswordService(currentArgon2idParameters);
   }
 
-  static createForTesting(parameters: Readonly<Argon2idParameters>): PasswordService {
+  static createForTesting(parameters: Readonly<Argon2idParameters>, loadNativeModules?: () => Promise<NativePasswordModules>): PasswordService {
     if (process.env.NODE_ENV !== "test") throw new Error("Unsafe password parameters are available only in tests");
-    return new PasswordService(parameters);
+    return new PasswordService(parameters, loadNativeModules);
   }
 
   validateNewPassword(password: string): void {
     const error = validatePasswordLength(password);
     if (error) throw new PasswordPolicyError(error);
+  }
+
+  /**
+   * Readiness verifies that the native verifier can be resolved without
+   * spending Argon2 work on every health request. Credential operations still
+   * perform real hash/verification work through the same loader.
+   */
+  async assertRuntimeAvailable(): Promise<void> {
+    await this.loadNativeModules();
   }
 
   async hash(password: string): Promise<string> {
@@ -62,6 +71,7 @@ export class PasswordService {
   }
 
   private async hashWithoutPolicy(password: string): Promise<string> {
+    const { argon2 } = await this.loadNativeModules();
     return argon2.hash(password, {
       type: argon2.argon2id,
       version: this.parameters.version,
@@ -77,6 +87,7 @@ export class PasswordService {
       if (passwordUtf8Length(password) > 1024) return { valid: false, reason: "mismatch" };
       if (!credential.passwordHash.startsWith("$argon2id$")) throw new CredentialFormatError("Malformed Argon2id credential");
       try {
+        const { argon2 } = await this.loadNativeModules();
         const valid = await argon2.verify(credential.passwordHash, password);
         return valid
           ? { valid: true, needsRehash: argon2.needsRehash(credential.passwordHash, {
@@ -100,6 +111,7 @@ export class PasswordService {
       if (passwordUtf8Length(password) > BCRYPT_MAX_BYTES) {
         return { valid: false, reason: "legacy_password_too_long" };
       }
+      const { bcrypt } = await this.loadNativeModules();
       const valid = await bcrypt.compare(password, credential.passwordHash);
       return valid ? { valid: true, needsRehash: true, algorithm: "bcrypt" } : { valid: false, reason: "mismatch" };
     }

@@ -14,7 +14,16 @@ import type { ApplicationDocument } from "@/lib/db/documents";
  * independent of a listening HTTP server so Docker's custom server and Vercel
  * Node Functions execute the same protocol bridge.
  */
-export async function handleIdentityNodeRequest(request: IncomingMessage, response: ServerResponse, environment: Environment): Promise<boolean> {
+export interface IdentityNodeRequestOptions {
+  /**
+   * The Vercel adapter sets configuration-derived forwarding headers after
+   * the platform edge has accepted the request. Docker's direct Node entry
+   * intentionally leaves this disabled.
+   */
+  trustedProxyHeaders?: boolean;
+}
+
+export async function handleIdentityNodeRequest(request: IncomingMessage, response: ServerResponse, environment: Environment, options: IdentityNodeRequestOptions = {}): Promise<boolean> {
   try {
     if (environment.APP_ENV === "production" && request.headers.host !== new URL(environment.IDENTITY_ISSUER_URL).host) {
       send(response, 421, "Misdirected request");
@@ -33,6 +42,9 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
     }
     const oidc = environment.OIDC_PROVIDER_ENABLED ? await getOidcProvider() : null;
     if (url.pathname === "/health/oidc" || url.pathname === "/health/ready") {
+      // Metadata routes do not need password modules, but readiness must prove
+      // that a normal credential-authentication request can resolve them.
+      if (oidc && url.pathname === "/health/ready") await oidc.runtime.passwords.assertRuntimeAvailable();
       send(response, oidc ? 200 : 503, oidc ? "ready" : "OIDC provider disabled");
       return true;
     }
@@ -41,6 +53,10 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
       send(response, 404, "OIDC provider unavailable");
       return true;
     }
+    // Koa's proxy mode is enabled only for Vercel's adapter, which writes the
+    // forwarding values from the fixed configured issuer. This avoids trusting
+    // caller-supplied forwarding headers in the portable Node entry.
+    oidc.provider.proxy = options.trustedProxyHeaders === true;
     const continuationService = new OidcInteractionContinuationService(
       oidc.runtime.database,
       decodeRequiredBase64Key(environment.SESSION_HMAC_KEY_BASE64!, "SESSION_HMAC_KEY_BASE64"),
