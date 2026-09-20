@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/oidc/**/*.ts": {
+      "includeFiles": "{dist/vercel-oidc/**,node_modules/argon2/**,node_modules/bcrypt/**,node_modules/node-gyp-build/**,node_modules/@phc/format/**,node_modules/node-addon-api/**}"
+    }
+  },
   "rewrites": [
     { "source": "/.well-known/openid-configuration", "destination": "/api/oidc/discovery" },
     { "source": "/authorize", "destination": "/api/oidc/authorize" },
