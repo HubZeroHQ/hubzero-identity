@@ -22,6 +22,7 @@
     "benchmark:password": "tsx scripts/benchmark-password.ts",
     "account:provision": "tsx scripts/provision-account.ts",
     "migration:studio:rehearse": "tsx scripts/rehearse-studio-migration.ts",
+    "migration:studio:inventory": "tsx scripts/studio-production-inventory.ts",
     "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
-# Phase 6 controlled initialization and cutover runbook
+# Phase 7 controlled initialization and cutover runbook
 
-Status: proposed only — do not execute from Phase 5.
+Status: proposed only — do not execute from Phase 6 until every required gate in
+`phase-6-precutover-validation.md` is PASS.
 
 Every step needs a named change owner, two-person review for source/manifest data,
 a recorded timestamp, and an explicit go/no-go decision. Stop at the first failed
@@ -41,7 +42,7 @@ mapping exists.
 - [ ] secret inventory and signing-key rotation drill are approved
 - [ ] provider indexes and exact clients/secrets have approved initialization plans
 - [ ] Studio coexistence/mapping proof passes in isolation
-- [ ] Fitness repository exists and its independent session/callback proof passes
+- [ ] Studio-only migration scope explicitly excludes Fitness until its product exists
 - [ ] read-only Studio inventory count is explained and accepted
 - [ ] email collisions, invalid values, and credential exceptions are resolved
 - [ ] role/capability and every Studio ObjectId reference path are reconciled
