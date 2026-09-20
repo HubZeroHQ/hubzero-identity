@@ -40,4 +40,14 @@ After acceptance criteria and retention window are met, remove Studio credential
 
 Enable validated recovery delivery, exercise key/secret rotation and incident runbooks, complete accessibility/protocol/security testing, deployment verification, documentation, and v1 readiness review.
 
+## Phase 5 scope amendment — 2026-09-20
+
+The approved Phase 5 request consolidates rehearsal work previously described
+under Phases 5 through 7: deployment/container readiness, production client
+contracts, a flag-gated Studio OIDC relying-party path with ObjectId mapping,
+Fitness's binding contract when its repository exists, synthetic inventory/dry-run
+tooling, and the Phase 6 operational runbook. This amendment changes no safety
+boundary: production indexes/clients/keys, source inventory, account import,
+session invalidation, and legacy-auth disablement remain Phase 6 operations.
+
 Each phase has an explicit entry/exit review. Future passkeys, MFA, recovery codes, external providers, public registration, and broad IAM administration remain outside v1.

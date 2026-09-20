@@ -79,7 +79,7 @@ The Phase 4 provider currently enables only discovery, JWKS, Authorization Code,
 
 ## Environments
 
-Localhost, preview/staging, and production use different issuers, databases, signing keys, cookie namespaces where required, and explicit client records. Preview callbacks are registered exactly; no wildcard hostnames. Production secrets come from the deployment secret manager and are validated before serving traffic. Development conveniences may never silently weaken production settings.
+Localhost, preview/staging, and production use different issuers, databases, signing keys, cookie namespaces where required, and explicit client records. Preview callbacks are registered exactly; no wildcard hostnames. Production secrets come from the deployment secret manager and are validated before serving traffic. Development conveniences may never silently weaken production settings. The OIDC signing keyset names one active private ES256 key by non-secret `OIDC_SIGNING_ACTIVE_KID`; previous public keys remain published only through their verification overlap.
 
 ## Ownership map
 
