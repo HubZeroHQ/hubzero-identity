@@ -81,6 +81,22 @@ sign-in, OIDC, key-rotation, restart, or rollback proof yet. See
 [`vercel-deployment.md`](vercel-deployment.md) for the exact contract and next
 rehearsal sequence.
 
+## Isolated rehearsal database preflight
+
+`REHEARSAL_MONGODB_URI` was accepted only after a separate preflight verified
+that it explicitly targets `hubzero_identity_rehearsal` and authenticates as
+exactly `readWrite@hubzero_identity_rehearsal`. The runtime `MONGODB_URI` was
+not used. No production database was contacted.
+
+The new `setup-vercel-rehearsal` command is restricted to `APP_ENV=test` and
+that database name. It applied 36 controlled indexes, then used the typed,
+audited provisioning service to create only a synthetic rehearsal application,
+explicit Studio membership, and synthetic account. This proves the Atlas role,
+transactions, index migration, and provisioning path for the isolated target.
+It is not a Vercel runtime proof: a coherent rehearsal-only Vercel secret set,
+temporary issuer/client configuration, deployment, and cross-request protocol
+exercise remain required.
+
 ## Blocker disposition
 
 | Phase 6 blocker | Status | Evidence / required input |
