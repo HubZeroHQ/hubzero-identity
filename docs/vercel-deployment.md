@@ -1,8 +1,9 @@
 # Vercel deployment contract
 
-Status: Vercel selected as the primary deployment target. The project has
-successfully built and deployed the adapter, but the canonical domain and a
-secret-backed isolated runtime rehearsal remain explicit Phase 6B gates.
+Status: Vercel selected as the primary deployment target. A secret-backed,
+isolated runtime rehearsal now proves readiness, discovery, JWKS, and real
+synthetic Argon2 sign-in. The canonical domain and full protocol durability
+rehearsal remain explicit Phase 6B gates.
 
 ## Topology
 
@@ -100,10 +101,26 @@ request path. With no configured project environment variables,
 `/health/ready` returned `500` without exposing missing-key details. This is
 the intended fail-closed result.
 
-The rehearsal did not initialize MongoDB or configure any production secret,
-client, signing key, account, or OIDC artifact. Deployment Protection is
-enabled, and `auth.hubzero.in` is not yet DNS-verified at Vercel. Those facts
-mean the deployment is not a usable Identity provider yet.
+The isolated rehearsal uses only `hubzero_identity_rehearsal`, test-only key
+material, a synthetic application/membership, and synthetic identities. Its
+database preflight accepted exactly `readWrite@hubzero_identity_rehearsal`.
+The deployed Node 22 Function returned live `204`, readiness `200`, HTTPS
+discovery with the explicit rehearsal issuer, and a public-only ES256 JWKS.
+An actual browser checked generic bad-password handling plus a successful
+synthetic Argon2 sign-in and HttpOnly server-side session lookup.
+
+The initial runtime defect was a missing native-password closure: Vercel's
+function trace omitted `argon2` transitive runtime files and Next rejected a
+variable dynamic import. Credential routes now explicitly trace the narrow
+`argon2`/`bcrypt` closure; readiness contains that closure and validates it;
+metadata routes do not eagerly load it. A build assertion checks the final
+function artifacts, and the native loader uses Node `createRequire` from the
+function root. No password semantics changed.
+
+Deployment Protection was temporarily disabled only for this synthetic browser
+check and restored afterward. `auth.hubzero.in` is still not DNS-verified at
+Vercel. No production secret, client, account, credential, or OIDC artifact
+was configured or created.
 
 ## Required next rehearsal
 

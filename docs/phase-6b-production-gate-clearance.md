@@ -65,13 +65,14 @@ default). The deployment became Ready in `iad1`; no Identity database,
 application, client, signing key, account, credential, or session was
 initialized.
 
-The project currently has **no environment variables**. `/health/live` returns
-`204`, while `/health/ready` returns `500` without disclosing configuration,
-proving that the deployment can answer liveness traffic but fails closed when
-required configuration is absent. Vercel Deployment Protection is enabled for
-ordinary public traffic. This is appropriate for the constrained rehearsal but
-must be deliberately reconciled with the public provider domain before
-production use.
+An isolated test-only Vercel configuration was then deployed against
+`hubzero_identity_rehearsal`, after its exact single-database role preflight.
+Live returned `204`, readiness returned `200`, discovery used the explicit
+HTTPS rehearsal issuer, JWKS contained only the active public ES256 key, and
+an actual browser exercised generic failed sign-in plus synthetic Argon2
+authentication and an HttpOnly Identity session. Deployment Protection was
+restored after the isolated browser check. No production configuration or data
+was used.
 
 `auth.hubzero.in` is known to the Vercel account but DNS is still delegated to
 Cloudflare and Vercel reports the required subdomain A record is absent. No DNS,
@@ -101,7 +102,7 @@ exercise remain required.
 
 | Phase 6 blocker | Status | Evidence / required input |
 | --- | --- | --- |
-| Identity production host | BLOCKED | Vercel is selected and the application deployed successfully, but custom-domain TLS, explicit secrets, public-access policy, and an isolated runtime rehearsal remain incomplete. |
+| Identity production host | BLOCKED | Vercel secret-backed isolated runtime, readiness, discovery/JWKS, and synthetic Argon2 sign-in now pass. Custom-domain TLS/canonical issuer plus redeploy, key-rotation, rollback, and full protocol durability evidence remain incomplete. |
 | Read-only Studio inventory | PASS | Guarded preflight verified exactly `read@hubzero`; production inventory was hash-free and read-only. |
 | Production-shaped rehearsal | PASS | Synthetic five-account fixture mirrors observed roles, states, bcrypt category/cost, ObjectId reference shapes, and Team shape. |
 | Real Studio ↔ Identity browser proof | BLOCKED | Requires isolated running Identity and Studio deployments, databases, test client, and test mapping. |
