@@ -1,3 +1,4 @@
+import { attachDatabasePool } from "@vercel/functions";
 import { MongoClient, type Db } from "mongodb";
 import type { Environment } from "@/lib/env";
 
@@ -9,10 +10,20 @@ export interface IdentityDatabaseConnection {
 }
 
 export async function getIdentityDatabaseConnection(environment: Environment): Promise<IdentityDatabaseConnection> {
-  clientPromise ??= new MongoClient(environment.MONGODB_URI, {
-    appName: "hubzero-identity",
-    retryWrites: true,
-  }).connect();
+  if (!clientPromise) {
+    const client = new MongoClient(environment.MONGODB_URI, {
+      appName: "hubzero-identity",
+      retryWrites: true,
+    });
+    // On Vercel Fluid compute this releases idle Mongo connections before an
+    // instance suspends. It is harmless in the portable Node/Docker runtime.
+    attachDatabasePool(client);
+    clientPromise = client.connect().catch((error) => {
+      // A transient cold-start failure must not poison a warm instance forever.
+      clientPromise = undefined;
+      throw error;
+    });
+  }
   const client = await clientPromise;
   return { client, database: client.db(environment.MONGODB_DATABASE) };
 }

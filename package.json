@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "tsx watch server.ts",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.6",
+    "@vercel/functions": "^3.9.8",
     "argon2": "^0.45.1",
     "bcrypt": "^6.0.0",
     "jose": "^6.2.12",

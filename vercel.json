@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/.well-known/openid-configuration", "destination": "/api/oidc/discovery" },
+    { "source": "/authorize", "destination": "/api/oidc/authorize" },
+    { "source": "/token", "destination": "/api/oidc/token" },
+    { "source": "/jwks", "destination": "/api/oidc/jwks" },
+    { "source": "/resume/:uid", "destination": "/api/oidc/resume/:uid" },
+    { "source": "/interaction/:uid/continue", "destination": "/api/oidc/interaction/:uid/continue" },
+    { "source": "/interaction/:uid", "destination": "/api/oidc/interaction/:uid" },
+    { "source": "/health/live", "destination": "/api/oidc/health/live" },
+    { "source": "/health/ready", "destination": "/api/oidc/health/ready" },
+    { "source": "/health/oidc", "destination": "/api/oidc/health/oidc" }
+  ]
+}

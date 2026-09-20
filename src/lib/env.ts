@@ -47,6 +47,9 @@ export const environmentSchema = z
         if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required when the OIDC provider is enabled` });
       }
     }
+    if (environment.APP_ENV === "preview" && environment.OIDC_PROVIDER_ENABLED) {
+      context.addIssue({ code: "custom", path: ["OIDC_PROVIDER_ENABLED"], message: "OIDC is disabled on previews; use an explicitly configured isolated test environment for protocol rehearsal" });
+    }
     if (environment.APP_ENV !== "production") return;
     if (!environment.IDENTITY_ISSUER_URL.startsWith("https://")) {
       context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must use HTTPS" });
