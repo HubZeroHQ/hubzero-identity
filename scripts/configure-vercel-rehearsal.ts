@@ -38,7 +38,8 @@ const setup = await run("npx", ["tsx", "scripts/setup-vercel-rehearsal.ts"], und
   ...deploymentEnvironment,
   REHEARSAL_TEST_PASSWORD: password,
   REHEARSAL_TEST_EMAIL: process.env.REHEARSAL_TEST_EMAIL ?? "vercel-rehearsal@example.invalid",
-  REHEARSAL_IDEMPOTENCY_KEY: "phase-6b-vercel-rehearsal-user-0001",
+  REHEARSAL_IDEMPOTENCY_KEY: process.env.REHEARSAL_IDEMPOTENCY_KEY ?? "phase-6b-vercel-rehearsal-user-0001",
+  REHEARSAL_STUDIO_CALLBACK_URL: "http://127.0.0.1:4100/studio/oidc/callback",
 });
 if (setup.exitCode !== 0) throw new Error("Unable to provision the isolated rehearsal identity");
 
