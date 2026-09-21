@@ -8,7 +8,9 @@ const email = process.env.REHEARSAL_TEST_EMAIL;
 const password = process.env.REHEARSAL_TEST_PASSWORD;
 const clientSecret = process.env.REHEARSAL_CLIENT_SECRET;
 if (!issuer || !email || !password || !clientSecret) throw new Error("Missing isolated remote OIDC rehearsal input");
-if (new URL(issuer).origin !== "https://hubzero-identity.vercel.app" || !email.endsWith("@example.invalid")) throw new Error("Remote OIDC rehearsal is limited to the explicit synthetic issuer and identity");
+const allowedIssuer = new URL(issuer).origin === "https://hubzero-identity.vercel.app"
+  || (process.env.REHEARSAL_CANONICAL_ISSUER === "true" && new URL(issuer).origin === "https://auth.hubzero.in");
+if (!allowedIssuer || !email.endsWith("@example.invalid")) throw new Error("Remote OIDC rehearsal is limited to an explicit synthetic issuer and identity");
 
 const callback = "http://127.0.0.1:4100/studio/oidc/callback";
 const clientId = "hubzero-studio-rehearsal";
@@ -50,13 +52,35 @@ try {
 
 async function authorize(page: import("@playwright/test").Page) {
   pending = { state: randomBytes(24).toString("base64url"), nonce: randomBytes(24).toString("base64url"), verifier: randomBytes(48).toString("base64url") };
+  const interactionResponses: number[] = [];
+  page.on("response", (response) => {
+    if (response.request().method() === "GET" && new URL(response.url()).pathname === "/authorize/interaction") interactionResponses.push(response.status());
+  });
   const authorization = new URL(`${issuer}/authorize`);
   authorization.search = new URLSearchParams({ client_id: clientId, response_type: "code", scope: "openid profile email", redirect_uri: callback, state: pending.state, nonce: pending.nonce, code_challenge: createHash("sha256").update(pending.verifier).digest("base64url"), code_challenge_method: "S256" }).toString();
   await page.goto(authorization.href);
+  const resumeCookieName = new URL(issuer!).origin === "https://auth.hubzero.in" ? "hz_oidc_resume" : "hz_oidc_resume_dev";
+  const resumeCookiePresent = (await page.context().cookies(issuer!)).some((cookie) => cookie.name === resumeCookieName && cookie.httpOnly && cookie.sameSite === "Lax" && cookie.secure === new URL(issuer!).protocol.startsWith("https"));
+  if (!resumeCookiePresent) throw new Error("Provider resume cookie was not retained before HubZero Account sign-in");
   await page.getByRole("textbox", { name: "Email" }).fill(email!);
   await page.getByRole("textbox", { name: "Password" }).fill(password!);
+  const signInResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/sign-in");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue with HubZero" }).click();
+  const response = await signInResponse;
+  await page.waitForURL(/\/authorize\/interaction/, { timeout: 30_000 }).catch(async () => {
+    const actionRedirect = response.headers()["x-action-redirect"] ?? response.headers().location ?? "none";
+    const status = (await page.locator("#sign-in-status").textContent().catch(() => null))?.trim() ?? "none";
+    throw new Error(`Sign-in did not reach the authorization interaction; status=${response.status()}; redirect=${actionRedirect}; path=${new URL(page.url()).pathname}; signInStatus=${JSON.stringify(status)}`);
+  });
+  await page.waitForTimeout(250);
+  const interactionStatus = interactionResponses.at(-1) ?? "unobserved";
+  const continueButton = page.getByRole("button", { name: "Continue with HubZero" });
+  await continueButton.waitFor({ state: "visible", timeout: 30_000 }).catch(async () => {
+    const headings = await page.getByRole("heading").allTextContents();
+    const buttons = await page.getByRole("button").allTextContents();
+    throw new Error(`Unexpected interaction surface at ${new URL(page.url()).pathname}; status=${interactionStatus}; headings=${JSON.stringify(headings)}; buttons=${JSON.stringify(buttons)}`);
+  });
+  await continueButton.click();
   await page.getByText("OIDC complete").waitFor();
 }
 

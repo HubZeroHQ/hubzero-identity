@@ -119,9 +119,11 @@ export interface OidcArtifactDocument {
   payload: Record<string, unknown>;
   expiresAt: Date | null;
   consumedAt: Date | null;
-  uidLookup: string | null;
-  userCodeLookup: string | null;
-  grantLookup: string | null;
+  // Secondary selectors are omitted rather than stored as null so MongoDB's
+  // sparse unique indexes truly exclude artifacts that do not expose one.
+  uidLookup?: string;
+  userCodeLookup?: string;
+  grantLookup?: string;
 }
 
 /** Opaque bridge between provider-native interactions and the Next.js interaction UI. */

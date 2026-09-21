@@ -80,6 +80,15 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
     }
     return false;
   } catch (error) {
+    // Keep the browser response deliberately generic, but preserve a bounded
+    // server-side classification for an operator investigating a failed OIDC
+    // request. In particular, never log request parameters: they may include
+    // authorization codes, client assertions, or other protocol secrets.
+    const failure = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : undefined;
+    console.error("oidc_request_failed", {
+      errorName: typeof failure?.name === "string" ? failure.name : "UnknownError",
+      errorCode: typeof failure?.code === "string" ? failure.code : undefined,
+    });
     if (!response.headersSent) send(response, 503, runtimeSafeError(environment, error));
     return true;
   }

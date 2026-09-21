@@ -16,6 +16,19 @@ export class MongoOidcAdapter implements Adapter {
     const now = new Date();
     const expiresAt = typeof expiresIn === "number" ? new Date(now.getTime() + expiresIn * 1000) : null;
     const encoded = { ...payload } as Record<string, unknown>;
+    // Sparse unique indexes only omit a document when the field is absent;
+    // writing `null` still indexes it. An interaction payload is permitted to
+    // omit `uid`, so retaining a literal null here would make every later
+    // uid-less artifact collide on the unique uidLookup index.
+    const lookups: Record<string, string> = {};
+    const unset: Record<string, ""> = {};
+    const setLookup = (field: "uidLookup" | "userCodeLookup" | "grantLookup", value: string | undefined, domain: string) => {
+      if (value) lookups[field] = this.secondaryLookup(domain, value);
+      else unset[field] = "";
+    };
+    setLookup("uidLookup", typeof payload.uid === "string" ? payload.uid : undefined, "uid");
+    setLookup("userCodeLookup", typeof payload.userCode === "string" ? payload.userCode : undefined, "user_code");
+    setLookup("grantLookup", grantable.has(this.model) && typeof payload.grantId === "string" ? payload.grantId : undefined, "grant");
     await oidcProviderArtifactsCollection(this.database, this.model).updateOne(
       { _id: this.idLookup(id) },
       { $set: {
@@ -23,10 +36,8 @@ export class MongoOidcAdapter implements Adapter {
         payload: encoded,
         expiresAt,
         consumedAt: payload.consumed ? new Date() : null,
-        uidLookup: typeof payload.uid === "string" ? this.secondaryLookup("uid", payload.uid) : null,
-        userCodeLookup: typeof payload.userCode === "string" ? this.secondaryLookup("user_code", payload.userCode) : null,
-        grantLookup: grantable.has(this.model) && typeof payload.grantId === "string" ? this.secondaryLookup("grant", payload.grantId) : null,
-      } },
+        ...lookups,
+      }, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
       { upsert: true },
     );
   }

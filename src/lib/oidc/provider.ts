@@ -31,6 +31,7 @@ export async function createOidcProvider(environment: Environment): Promise<Oidc
     subjectTypes: ["public"],
     scopes: ["openid", "profile", "email"],
     claims: { openid: ["sub"], profile: ["name"], email: ["email", "email_verified"] },
+    responseTypes: ["code"],
     clientAuthMethods: ["client_secret_basic"],
     enabledJWA: { idTokenSigningAlgValues: ["ES256"] },
     pkce: { required: () => true },
@@ -40,7 +41,10 @@ export async function createOidcProvider(environment: Environment): Promise<Oidc
     ttl: { AuthorizationCode: 60, AccessToken: 300, IdToken: 300, Interaction: 10 * 60, Session: 60 * 60, Grant: 60 * 60 },
     cookies: {
       names: environment.APP_ENV === "production"
-        ? { session: "__Host-hz_oidc", interaction: "__Host-hz_oidc_interaction", resume: "__Host-hz_oidc_resume" }
+        // oidc-provider scopes the resume cookie to /authorize/:uid. It must
+        // therefore not use the __Host- prefix, whose contract requires
+        // Path=/; Chromium correctly rejects that combination.
+        ? { session: "__Host-hz_oidc", interaction: "__Host-hz_oidc_interaction", resume: "hz_oidc_resume" }
         : { session: "hz_oidc_dev", interaction: "hz_oidc_interaction_dev", resume: "hz_oidc_resume_dev" },
       keys: [cookieKey],
       long: { httpOnly: true, secure: environment.APP_ENV !== "development" && environment.APP_ENV !== "test", sameSite: "lax", path: "/" },
@@ -71,6 +75,22 @@ export async function createOidcProvider(environment: Environment): Promise<Oidc
       };
     },
     renderError: (ctx, _out, error) => {
+      // The browser receives a deliberately generic page. Keep only an
+      // allowlisted provider error classification in server logs; request
+      // parameters can contain security-sensitive protocol material.
+      const providerError = error as { name?: unknown; error?: unknown; code?: unknown; codeName?: unknown; keyPattern?: unknown };
+      console.error("oidc_provider_request_rejected", {
+        errorName: typeof providerError.name === "string" ? providerError.name : "UnknownError",
+        errorCode: typeof providerError.error === "string"
+          ? providerError.error
+          : typeof providerError.code === "string" || typeof providerError.code === "number"
+            ? providerError.code
+            : undefined,
+        errorCodeName: typeof providerError.codeName === "string" ? providerError.codeName : undefined,
+        duplicateKeyFields: providerError.code === 11000 && providerError.keyPattern && typeof providerError.keyPattern === "object"
+          ? Object.keys(providerError.keyPattern as Record<string, unknown>)
+          : undefined,
+      });
       ctx.status = 400;
       ctx.type = "html";
       void error;

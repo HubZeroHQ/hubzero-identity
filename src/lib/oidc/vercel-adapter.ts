@@ -29,3 +29,18 @@ export async function handleVercelOidcRoute(request: IncomingMessage, response: 
 export function canonicalVercelOidcPath(pathname: string, requestUrl: string | undefined): string {
   return `${pathname}${new URL(requestUrl ?? "/", "https://internal.hubzero.invalid").search}`;
 }
+
+/**
+ * Vercel's dynamic rewrite transports `/authorize/:uid` as the fixed
+ * authorize Function plus `?uid=…`. Restore the provider route while keeping
+ * that implementation-only query parameter out of oidc-provider's request
+ * parser. A caller-supplied malformed uid remains an ordinary invalid
+ * authorization parameter rather than becoming a path.
+ */
+export function resolveVercelAuthorizationRoute(requestUrl: string | undefined): { pathname: string; requestUrl: string } {
+  const url = new URL(requestUrl ?? "/api/oidc/authorize", "https://internal.hubzero.invalid");
+  const uid = url.searchParams.get("uid");
+  if (!uid || !/^[A-Za-z0-9_-]{16,160}$/.test(uid)) return { pathname: "/authorize", requestUrl: `${url.pathname}${url.search}` };
+  url.searchParams.delete("uid");
+  return { pathname: `/authorize/${uid}`, requestUrl: `${url.pathname}${url.search}` };
+}

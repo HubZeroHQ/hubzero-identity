@@ -7,6 +7,13 @@ if (!rehearsalUri) throw new Error("REHEARSAL_MONGODB_URI is required; this comm
 if (new URL(rehearsalUri).pathname.replace(/^\/+/, "") !== "hubzero_identity_rehearsal") {
   throw new Error("REHEARSAL_MONGODB_URI must explicitly target hubzero_identity_rehearsal");
 }
+const applicationEnvironment = process.env.REHEARSAL_APP_ENV ?? "test";
+const issuer = process.env.REHEARSAL_ISSUER_URL ?? "https://hubzero-identity.vercel.app";
+const isGenericRehearsal = applicationEnvironment === "test" && issuer === "https://hubzero-identity.vercel.app";
+const isCanonicalRehearsal = applicationEnvironment === "production" && issuer === "https://auth.hubzero.in";
+if (!isGenericRehearsal && !isCanonicalRehearsal) {
+  throw new Error("Rehearsal deployment must be either the explicit test issuer or the explicit canonical issuer");
+}
 
 const signingKey = await exportJWK((await generateKeyPair("ES256", { extractable: true })).privateKey);
 Object.assign(signingKey, { kid: "phase-6b-rehearsal-a", alg: "ES256", use: "sig" });
@@ -16,8 +23,8 @@ const clientSecret = process.env.REHEARSAL_CLIENT_SECRET ?? randomBytes(48).toSt
 if (password.length < 16 || clientSecret.length < 32) throw new Error("Supplied rehearsal credential material is too short");
 
 const deploymentEnvironment = {
-  APP_ENV: "test",
-  IDENTITY_ISSUER_URL: "https://hubzero-identity.vercel.app",
+  APP_ENV: applicationEnvironment,
+  IDENTITY_ISSUER_URL: issuer,
   MONGODB_URI: rehearsalUri,
   OIDC_PROVIDER_ENABLED: "true",
   SESSION_HMAC_KEY_BASE64: randomBytes(32).toString("base64"),
@@ -28,14 +35,22 @@ const deploymentEnvironment = {
   OIDC_CLIENT_SECRETS_JSON: JSON.stringify({ "studio-rehearsal": clientSecret }),
 };
 
-await Promise.all(Object.entries(deploymentEnvironment).map(async ([name, value]) => {
+// Vercel serializes project-environment mutations. Keeping these writes
+// ordered avoids a partially accepted rehearsal configuration when the
+// platform rejects simultaneous replace requests.
+for (const [name, value] of Object.entries(deploymentEnvironment)) {
   const outcome = await run("npx", ["vercel", "env", "add", name, "production", "--sensitive", "--force", "--yes", "--scope", "rifaques-projects"], value);
   if (outcome.exitCode !== 0) throw new Error(`Vercel rejected rehearsal configuration ${name}`);
-}));
+}
 
 const setup = await run("npx", ["tsx", "scripts/setup-vercel-rehearsal.ts"], undefined, {
   ...process.env,
   ...deploymentEnvironment,
+  // Fixture provisioning is permanently test-only even when the deployed
+  // runtime is temporarily exercising the canonical hostname against the
+  // isolated rehearsal database.
+  APP_ENV: "test",
+  IDENTITY_ISSUER_URL: "https://hubzero-identity.vercel.app",
   REHEARSAL_TEST_PASSWORD: password,
   REHEARSAL_TEST_EMAIL: process.env.REHEARSAL_TEST_EMAIL ?? "vercel-rehearsal@example.invalid",
   REHEARSAL_IDEMPOTENCY_KEY: process.env.REHEARSAL_IDEMPOTENCY_KEY ?? "phase-6b-vercel-rehearsal-user-0001",
