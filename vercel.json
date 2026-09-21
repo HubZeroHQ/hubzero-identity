@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/.well-known/openid-configuration", "destination": "/api/oidc/discovery" },
     { "source": "/authorize", "destination": "/api/oidc/authorize" },
+    { "source": "/authorize/:uid((?!interaction$)[A-Za-z0-9_-]+)", "destination": "/api/oidc/authorize" },
     { "source": "/token", "destination": "/api/oidc/token" },
     { "source": "/jwks", "destination": "/api/oidc/jwks" },
     { "source": "/resume/:uid", "destination": "/api/oidc/resume/:uid" },
