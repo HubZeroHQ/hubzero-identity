@@ -14,7 +14,7 @@ try {
   const legacyPage = await legacy.newPage();
   await legacyPage.goto(`${studioUrl}/studio/login`);
   await legacyPage.getByLabel('Email').fill(email);
-  await legacyPage.getByLabel('Password').fill(password);
+  await legacyPage.getByRole('textbox', { name: 'Password' }).fill(password);
   await legacyPage.getByRole('button', { name: 'Sign in' }).click();
   await legacyPage.waitForURL(/\/studio\/dashboard/, { timeout: 30_000 });
   const legacyStudioSession = (await legacy.cookies()).some((cookie) => cookie.domain === new URL(studioUrl).hostname && cookie.name.includes('authjs'));
@@ -26,8 +26,10 @@ try {
   await page.getByRole('link', { name: /Continue with HubZero/ }).click();
   await page.waitForURL(new RegExp(`${new URL(issuer).hostname.replaceAll('.', '\\.')}`), { timeout: 30_000 });
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByRole('textbox', { name: 'Password' }).fill(password);
   await page.getByRole('button', { name: 'Continue' }).click();
+  await page.waitForURL(/\/authorize\/interaction/, { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Continue with HubZero' }).click();
   await page.waitForURL(/\/studio\/dashboard/, { timeout: 45_000 });
   const cookies = await oidc.cookies();
   const studioSession = cookies.some((cookie) => cookie.domain === new URL(studioUrl).hostname && cookie.name.includes('authjs'));
