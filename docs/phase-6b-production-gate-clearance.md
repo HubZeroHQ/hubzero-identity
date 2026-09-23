@@ -74,13 +74,26 @@ authentication and an HttpOnly Identity session. Deployment Protection was
 restored after the isolated browser check. No production configuration or data
 was used.
 
-`auth.hubzero.in` is known to the Vercel account but DNS is still delegated to
-Cloudflare and Vercel reports the required subdomain A record is absent. No DNS,
-domain attachment, environment-variable, or protection-policy change was made.
-Consequently there is no custom-domain TLS, canonical issuer, Account,
-sign-in, OIDC, key-rotation, restart, or rollback proof yet. See
-[`vercel-deployment.md`](vercel-deployment.md) for the exact contract and next
-rehearsal sequence.
+Vercel now verifies `auth.hubzero.in` as attached to this project. Cloudflare
+remains the authoritative DNS provider by design; the subdomain has Vercel's
+specified DNS-only CNAME and Vercel reports no conflict. A healthy,
+rehearsal-only deployment is aliased to the domain, using
+`hubzero_identity_rehearsal` rather than `hubzero` or the eventual production
+Identity database.
+
+At canonical HTTPS, `/health/live` returned `204` and `/health/ready` returned
+`200`. Discovery reported exactly `https://auth.hubzero.in` and advertised
+canonical `/authorize`, `/token`, and `/jwks` endpoints only. The real Vercel
+browser rehearsal completed Authorization Code + PKCE S256 through password
+authentication, active membership, interaction continuation, code exchange,
+ES256 ID-token validation, and a rejected second exchange of the same code.
+Runtime logs recorded the expected token requests without secret material. The
+browser retained the canonical `__Host-hz_session` only with `Secure`,
+`HttpOnly`, `SameSite=Lax`, `Path=/`, and host-only semantics.
+
+This is canonical-host runtime evidence using only synthetic accounts, a
+synthetic client, fresh rehearsal secrets, and the isolated database. It is
+not production Identity initialization or a production user migration.
 
 ## Isolated rehearsal database preflight
 
@@ -102,21 +115,26 @@ exercise remain required.
 
 | Phase 6 blocker | Status | Evidence / required input |
 | --- | --- | --- |
-| Identity production host | BLOCKED | Vercel secret-backed isolated runtime, readiness, discovery/JWKS, and synthetic Argon2 sign-in now pass. Custom-domain TLS/canonical issuer plus redeploy, key-rotation, rollback, and full protocol durability evidence remain incomplete. |
+| Identity production host | PASS | Vercel Node 22 runtime is live behind the verified canonical domain with isolated rehearsal configuration; readiness, discovery, JWKS, real Authorization Code + PKCE exchange, replay rejection, and the production cookie contract pass. |
 | Read-only Studio inventory | PASS | Guarded preflight verified exactly `read@hubzero`; production inventory was hash-free and read-only. |
 | Production-shaped rehearsal | PASS | Synthetic five-account fixture mirrors observed roles, states, bcrypt category/cost, ObjectId reference shapes, and Team shape. |
 | Real Studio ↔ Identity browser proof | BLOCKED | Requires isolated running Identity and Studio deployments, databases, test client, and test mapping. |
 | Final Phase 7 gate | BLOCKED | Required prerequisite gates remain blocked. |
 
+The remaining browser-proof precondition is specifically an ignored
+`STUDIO_REHEARSAL_MONGODB_URI` scoped to `hubzero_studio_rehearsal`; the normal
+Studio runtime URI is deliberately not used as a substitute.
+
 ## Exact unblockers
 
-### Hosting
+### Studio browser proof
 
-Configure an isolated Vercel rehearsal deployment with its own non-production
-Atlas database, signing keyset, test client credentials, and test identity.
-Then verify the canonical custom domain only when `auth.hubzero.in` DNS/TLS and
-the public-access policy are explicitly approved. Supply secrets only through
-Vercel's environment settings; do not put them in Git or local documentation.
+Supply an ignored local `STUDIO_REHEARSAL_MONGODB_URI` that explicitly targets
+only `hubzero_studio_rehearsal` with
+`readWrite@hubzero_studio_rehearsal`. Then initialize the synthetic fixture
+through controlled tooling and run the actual Studio application in `dual`
+mode against the actual Identity provider. The existing Studio runtime URI is
+not an acceptable substitute.
 
 ### Inventory
 
@@ -146,12 +164,13 @@ artifact exists in the repository.
 | Vercel runtime compatibility and repository adapter | PASS |
 | Hosting target selected | PASS |
 | Vercel deployment and liveness | PASS |
-| Vercel HTTPS/proxy, readiness, secrets, signing rotation, custom domain, restart/rollback | BLOCKED |
+| Vercel HTTPS/proxy, readiness, secrets, custom domain, canonical issuer, deployed Authorization Code + PKCE/replay, and production cookie | PASS |
+| Concurrent replay stress, exhaustive distributed persistence, live A-to-B signing rotation, and live rollback exercise | NOT APPLICABLE (post-Phase-7 operational hardening) |
 | Scoped read-only credential and actual inventory | PASS |
 | Account count, normalization, credentials, CMS, Team evidence | PASS |
 | Studio auth freshness and isolated invalidation rehearsal | PASS |
 | Auth modes remain safe | PASS |
-| Same-ObjectId, real browser SSO, denial/callback/email/logout proof | BLOCKED |
+| Same-ObjectId, real browser SSO, critical denial, and Studio-authority proof | BLOCKED |
 | Sanitized production-shaped fixture and manifest | PASS |
 | Dry run, migration, idempotency, interruption, reconciliation, rollback | PASS |
 | No high/critical auth dependency finding | PASS |
@@ -160,7 +179,8 @@ artifact exists in the repository.
 
 **Phase 7 gate: NO-GO.**
 
-The only remaining work is to obtain the hosting and scoped read-only inventory
-access above, then run the already-designed deployment, inventory, manifest,
-rehearsal, and real browser proofs. Do not start Phase 7 until every required
-gate is PASS.
+The only remaining required work is the real isolated Studio-to-Identity browser
+proof. Concurrent replay stress, exhaustive distributed persistence, live
+signing-key rotation, live Vercel rollback, and an exhaustive callback-negative
+browser matrix remain explicitly tracked as post-Phase-7 operational hardening;
+they are not waived or claimed as executed.

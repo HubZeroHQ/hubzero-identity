@@ -91,6 +91,7 @@ async function authorize(page: import("@playwright/test").Page) {
       && sessionCookie.httpOnly
       && sessionCookie.sameSite === "Lax";
     canonicalSessionCookieIsSafe = sessionCookieIsSafe;
+    if (!sessionCookieIsSafe) throw new Error("Canonical Identity session cookie attributes were not preserved");
   }
   await page.waitForTimeout(250);
   const interactionStatus = interactionResponses.at(-1) ?? "unobserved";

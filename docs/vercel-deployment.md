@@ -1,9 +1,10 @@
 # Vercel deployment contract
 
 Status: Vercel selected as the primary deployment target. A secret-backed,
-isolated runtime rehearsal now proves readiness, discovery, JWKS, and real
-synthetic Argon2 sign-in. The canonical domain and full protocol durability
-rehearsal remain explicit Phase 6B gates.
+isolated runtime rehearsal now proves canonical-domain readiness, discovery,
+JWKS, real synthetic Argon2 sign-in, Authorization Code + PKCE exchange, and
+one-time authorization-code rejection. Broader operational exercises remain
+explicit post-Phase-7 hardening work.
 
 ## Topology
 
@@ -117,12 +118,34 @@ metadata routes do not eagerly load it. A build assertion checks the final
 function artifacts, and the native loader uses Node `createRequire` from the
 function root. No password semantics changed.
 
-Deployment Protection was temporarily disabled only for this synthetic browser
-check and restored afterward. `auth.hubzero.in` is still not DNS-verified at
-Vercel. No production secret, client, account, credential, or OIDC artifact
-was configured or created.
+Vercel has verified `auth.hubzero.in` on the correct project. Cloudflare
+continues to provide authoritative DNS, with only Vercel's requested DNS-only
+subdomain CNAME; no nameserver change or Cloudflare proxy is required. The
+healthy isolated rehearsal deployment was aliased to the canonical host and
+returned live `204`, ready `200`, canonical discovery metadata, and canonical
+JWKS. The browser verifier asserts that a retained `__Host-hz_session` has
+Secure, HttpOnly, SameSite=Lax, Path=/, and host-only semantics.
 
-## Required next rehearsal
+The proof uses fresh rehearsal secrets and only `hubzero_identity_rehearsal`.
+No production secret, client, account, credential, membership, mapping, or
+OIDC artifact was configured or created.
+
+## Rollback procedure and deferred hardening
+
+For Phase 7, the deployment rollback procedure is: select the last verified
+Vercel deployment in the project, promote it through the Vercel Deployments UI
+or `vercel promote <deployment> --scope rifaques-projects`, then verify
+`/health/live`, `/health/ready`, discovery, JWKS, and sign-in. Deployment
+rollback does not roll back Identity or Studio data and must not be used as a
+migration rollback substitute.
+
+The following exercises remain post-Phase-7 operational hardening: concurrent
+code-consumption stress, exhaustive cross-instance artifact persistence, live
+A-to-B signing-key rotation, live Vercel rollback exercise, and the exhaustive
+callback-negative browser matrix. Their existing protections/tests remain in
+place; this document does not claim that those live exercises occurred.
+
+Historical next-rehearsal checklist (superseded for Phase 6B exit):
 
 The selected Vercel project must next prove:
 
@@ -136,7 +159,5 @@ The selected Vercel project must next prove:
    and a previous-deployment rollback; and
 6. the A→B key-overlap procedure with rehearsal keys.
 
-Until this occurs, Vercel is an approved deployment target but not an approved
-Identity production runtime. No production Identity collection initialization,
-client registration, account provisioning, or Studio cutover is authorized by
-this document.
+The historical checklist does not authorize any production Identity collection
+initialization, client registration, account provisioning, or Studio cutover.
