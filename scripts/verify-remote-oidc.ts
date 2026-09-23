@@ -34,6 +34,7 @@ const server = createServer(async (request, response) => {
 await new Promise<void>((resolve, reject) => server.listen(4100, "127.0.0.1", () => resolve()).on("error", reject));
 
 let pending: { state: string; nonce: string; verifier: string } | undefined;
+let canonicalSessionCookieIsSafe: boolean | undefined;
 try {
   const page = await browser.newPage();
   await authorize(page);
@@ -42,7 +43,7 @@ try {
   if (replay.status !== 400) throw new Error("Authorization-code replay was accepted");
   const idHeader = decodeProtectedHeader(last.token);
   const claims = await jwtVerify(last.token, createRemoteJWKSet(new URL(`${issuer}/jwks`)), { issuer, audience: clientId });
-  const output = { authorizationCodeFlow: true, pkceS256: true, tokenVerified: true, replayRejected: true, subjectFormat: /^hz_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(claims.payload.sub)), activeKid: idHeader.kid, roleClaimAbsent: !("role" in claims.payload) };
+  const output = { authorizationCodeFlow: true, pkceS256: true, tokenVerified: true, replayRejected: true, subjectFormat: /^hz_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(claims.payload.sub)), activeKid: idHeader.kid, roleClaimAbsent: !("role" in claims.payload), ...(new URL(issuer).origin === "https://auth.hubzero.in" ? { canonicalSessionCookie: canonicalSessionCookieIsSafe === true } : {}) };
   process.stdout.write(`${JSON.stringify(output)}\n`);
   await page.context().close();
 } finally {
@@ -59,8 +60,16 @@ async function authorize(page: import("@playwright/test").Page) {
   const authorization = new URL(`${issuer}/authorize`);
   authorization.search = new URLSearchParams({ client_id: clientId, response_type: "code", scope: "openid profile email", redirect_uri: callback, state: pending.state, nonce: pending.nonce, code_challenge: createHash("sha256").update(pending.verifier).digest("base64url"), code_challenge_method: "S256" }).toString();
   await page.goto(authorization.href);
-  const resumeCookieName = new URL(issuer!).origin === "https://auth.hubzero.in" ? "hz_oidc_resume" : "hz_oidc_resume_dev";
-  const resumeCookiePresent = (await page.context().cookies(issuer!)).some((cookie) => cookie.name === resumeCookieName && cookie.httpOnly && cookie.sameSite === "Lax" && cookie.secure === new URL(issuer!).protocol.startsWith("https"));
+  const issuerUrl = new URL(issuer!);
+  const resumeCookieName = issuerUrl.origin === "https://auth.hubzero.in" ? "hz_oidc_resume" : "hz_oidc_resume_dev";
+  // oidc-provider scopes this cookie to /authorize/:uid. Asking Playwright for
+  // cookies at the issuer root omits a deliberately path-scoped cookie.
+  const resumeCookiePresent = (await page.context().cookies()).some((cookie) => cookie.name === resumeCookieName
+    && cookie.domain === issuerUrl.hostname
+    && cookie.path.startsWith("/authorize/")
+    && cookie.httpOnly
+    && cookie.sameSite === "Lax"
+    && cookie.secure === (issuerUrl.protocol === "https:"));
   if (!resumeCookiePresent) throw new Error("Provider resume cookie was not retained before HubZero Account sign-in");
   await page.getByRole("textbox", { name: "Email" }).fill(email!);
   await page.getByRole("textbox", { name: "Password" }).fill(password!);
@@ -72,6 +81,17 @@ async function authorize(page: import("@playwright/test").Page) {
     const status = (await page.locator("#sign-in-status").textContent().catch(() => null))?.trim() ?? "none";
     throw new Error(`Sign-in did not reach the authorization interaction; status=${response.status()}; redirect=${actionRedirect}; path=${new URL(page.url()).pathname}; signInStatus=${JSON.stringify(status)}`);
   });
+  if (issuerUrl.origin === "https://auth.hubzero.in") {
+    const sessionCookie = (await page.context().cookies()).find((cookie) => cookie.name === "__Host-hz_session");
+    // A user agent retains a __Host- cookie only with Secure, Path=/, and no
+    // Domain attribute. Inspecting the browser cookie adds HttpOnly/SameSite.
+    const sessionCookieIsSafe = sessionCookie?.domain === issuerUrl.hostname
+      && sessionCookie.path === "/"
+      && sessionCookie.secure
+      && sessionCookie.httpOnly
+      && sessionCookie.sameSite === "Lax";
+    canonicalSessionCookieIsSafe = sessionCookieIsSafe;
+  }
   await page.waitForTimeout(250);
   const interactionStatus = interactionResponses.at(-1) ?? "unobserved";
   const continueButton = page.getByRole("button", { name: "Continue with HubZero" });

@@ -14,6 +14,7 @@
     "verify:argon2-runtime": "tsx scripts/verify-argon2-runtime.ts",
     "verify:vercel-sign-in": "tsx scripts/verify-vercel-sign-in.ts",
     "vercel:rehearsal:configure": "tsx scripts/configure-vercel-rehearsal.ts",
+    "vercel:rehearsal:canonical": "tsx scripts/run-vercel-canonical-rehearsal.ts",
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=dist/server.mjs",
     "start": "node dist/server.mjs",
     "lint": "eslint . --max-warnings=0",
