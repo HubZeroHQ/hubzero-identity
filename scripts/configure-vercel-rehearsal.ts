@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { exportJWK, generateKeyPair } from "jose";
 
 const rehearsalUri = process.env.REHEARSAL_MONGODB_URI;
@@ -57,14 +59,36 @@ const setup = await run("npx", ["tsx", "scripts/setup-vercel-rehearsal.ts"], und
   REHEARSAL_STUDIO_CALLBACK_URL: "http://127.0.0.1:4100/studio/oidc/callback",
 });
 if (setup.exitCode !== 0) throw new Error("Unable to provision the isolated rehearsal identity");
+const setupRecord = parseSetupRecord(setup.stdout);
+const safeSubjectOutputPath = process.env.REHEARSAL_SUBJECT_OUTPUT_PATH;
+if (safeSubjectOutputPath) {
+  const resolvedOutput = resolve(safeSubjectOutputPath);
+  const resolvedTemp = resolve(process.env.TEMP ?? process.env.TMP ?? "");
+  if (!resolvedTemp || !resolvedOutput.startsWith(`${resolvedTemp}\\`)) {
+    throw new Error("REHEARSAL_SUBJECT_OUTPUT_PATH must be an absolute path beneath the local temporary directory");
+  }
+  await writeFile(resolvedOutput, JSON.stringify({ syntheticAccounts: setupRecord.syntheticAccounts }), { encoding: "utf8", mode: 0o600 });
+}
 
-process.stdout.write(`${JSON.stringify({ configured: Object.keys(deploymentEnvironment), targetDatabase: "hubzero_identity_rehearsal", syntheticIdentityProvisioned: true })}\n`);
+process.stdout.write(`${JSON.stringify({ configured: Object.keys(deploymentEnvironment), targetDatabase: "hubzero_identity_rehearsal", syntheticAccounts: setupRecord.syntheticAccounts })}\n`);
 
-function run(command: string, args: string[], input?: string, environment?: NodeJS.ProcessEnv): Promise<{ exitCode: number | null }> {
+function run(command: string, args: string[], input?: string, environment?: NodeJS.ProcessEnv): Promise<{ exitCode: number | null; stdout: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { shell: process.platform === "win32", env: environment, stdio: ["pipe", "ignore", "ignore"] });
+    const child = spawn(command, args, { shell: process.platform === "win32", env: environment, stdio: ["pipe", "pipe", "ignore"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8"); });
     child.on("error", reject);
-    child.on("close", (exitCode) => resolve({ exitCode }));
+    child.on("close", (exitCode) => resolve({ exitCode, stdout }));
     child.stdin.end(input);
   });
+}
+
+function parseSetupRecord(output: string): { syntheticAccounts: Array<{ kind: string; subject: string }> } {
+  const line = output.split(/\r?\n/).find((entry) => entry.startsWith("{"));
+  if (!line) throw new Error("Synthetic rehearsal setup did not return its safe subject metadata");
+  const parsed = JSON.parse(line) as { syntheticAccounts?: unknown };
+  if (!Array.isArray(parsed.syntheticAccounts) || !parsed.syntheticAccounts.every((entry) => typeof entry === "object" && entry !== null && typeof (entry as { kind?: unknown }).kind === "string" && typeof (entry as { subject?: unknown }).subject === "string")) {
+    throw new Error("Synthetic rehearsal setup returned malformed subject metadata");
+  }
+  return { syntheticAccounts: parsed.syntheticAccounts as Array<{ kind: string; subject: string }> };
 }

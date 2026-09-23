@@ -46,13 +46,15 @@ try {
     { email: `${local}.no-mapping@${domain}`, name: "Synthetic Rehearsal No Mapping", memberships: ["studio-rehearsal"], suffix: "no-mapping" },
     { email: `${local}.disabled@${domain}`, name: "Synthetic Rehearsal Disabled", memberships: ["studio-rehearsal"], suffix: "disabled" },
   ];
+  const provisionedAccounts: Array<{ kind: string; subject: string }> = [];
   for (const account of rehearsalAccounts) {
-    await provisioner.provision({
+    const result = await provisioner.provision({
       name: account.name, email: account.email, password,
       accountType: "internal", mustChangePassword: false, applicationIds: account.memberships,
       idempotencyKey: `${idempotencyKey}:${account.suffix}`, actorSubject: "hz_01J8Y80J3QY33NZ7J7D8FV1J0M" as never,
       reason: "Phase 6B isolated Vercel runtime rehearsal",
     });
+    provisionedAccounts.push({ kind: account.suffix, subject: result.subject });
   }
-  process.stdout.write(`${JSON.stringify({ database: environment.MONGODB_DATABASE, indexesCreated: indexes.create.length, indexesVerified: indexes.verified.length, application: "studio-rehearsal", syntheticAccounts: rehearsalAccounts.length })}\n`);
+  process.stdout.write(`${JSON.stringify({ database: environment.MONGODB_DATABASE, indexesCreated: indexes.create.length, indexesVerified: indexes.verified.length, application: "studio-rehearsal", syntheticAccounts: provisionedAccounts })}\n`);
 } finally { await client.close(); }

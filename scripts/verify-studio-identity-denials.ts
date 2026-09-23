@@ -30,6 +30,14 @@ async function start(email: string) {
   await page.getByLabel('Email').fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill(password!);
   await page.getByRole('button', { name: 'Continue' }).click();
+  await Promise.race([
+    page.waitForURL(/\/authorize\/interaction/, { timeout: 30_000 }),
+    page.getByRole('heading', { name: 'Access unavailable' }).waitFor({ timeout: 30_000 }),
+  ]);
+  const identitySession = (await context.cookies()).some(
+    (cookie) => cookie.domain === new URL(issuer!).hostname && cookie.name === '__Host-hz_session',
+  );
+  if (!identitySession) throw new Error('Synthetic Identity session cookie was not established before Studio authorization');
   return { context, page };
 }
 
@@ -46,8 +54,7 @@ async function expectMembershipDenial(email: string) {
 async function expectStudioDenial(email: string) {
   const { context, page } = await start(email);
   try {
-    await page.waitForURL(/\/authorize\/interaction/, { timeout: 30_000 });
-    await page.getByRole('button', { name: 'Continue with HubZero' }).click();
+    await page.getByRole('button', { name: 'Continue with HubZero' }).click({ noWaitAfter: true });
     await page.waitForURL(/\/studio\/login\?oidcError=1/, { timeout: 45_000 });
     await assertNoStudioSession(context);
   } finally {
