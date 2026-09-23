@@ -30,8 +30,7 @@ try {
   await page.getByLabel('Email').fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill(password);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.waitForURL(/\/authorize\/interaction/, { timeout: 30_000 });
-  await page.getByRole('button', { name: 'Continue with HubZero' }).click({ noWaitAfter: true });
+  await continueFirstPartyInteraction(page);
   await page.waitForURL(/\/studio\/dashboard/, { timeout: 45_000 });
   await assertStudioUser(page, expectedStudioUserId);
   const cookies = await oidc.cookies();
@@ -46,7 +45,7 @@ try {
     throw new Error('Identity SSO unexpectedly requested a second password');
   }
   if (/\/authorize\/interaction/.test(new URL(page.url()).pathname)) {
-    await page.getByRole('button', { name: 'Continue with HubZero' }).click({ noWaitAfter: true });
+    await continueFirstPartyInteraction(page);
     await page.waitForURL(/\/studio\/dashboard/, { timeout: 45_000 });
   }
   const reusedStudioSession = (await oidc.cookies()).some(
@@ -58,6 +57,20 @@ try {
   await oidc.close();
 } finally {
   await browser.close();
+}
+
+async function continueFirstPartyInteraction(page: import('@playwright/test').Page) {
+  await page.waitForURL(/\/(?:authorize\/interaction|studio\/dashboard)/, { timeout: 30_000 });
+  if (/\/studio\/dashboard/.test(new URL(page.url()).pathname)) return;
+  if (await page.getByRole('heading', { name: 'Access unavailable' }).isVisible().catch(() => false)) {
+    throw new Error('INTERACTION_STATE_MISMATCH: authenticated subject lacks the expected first-party application access');
+  }
+  const continuation = page.getByRole('button', { name: 'Continue with HubZero', exact: true });
+  if (!await continuation.isVisible().catch(() => false)) {
+    const heading = await page.locator('h1').first().textContent().catch(() => null);
+    throw new Error(`INTERACTION_STATE_MISMATCH: expected first-party continuation, observed heading ${JSON.stringify(heading)}`);
+  }
+  await continuation.click({ noWaitAfter: true });
 }
 
 async function assertStudioUser(page: import('@playwright/test').Page, expectedId: string) {
