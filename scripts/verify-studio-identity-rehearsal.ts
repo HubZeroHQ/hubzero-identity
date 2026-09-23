@@ -62,11 +62,16 @@ try {
 async function continueFirstPartyInteraction(page: import('@playwright/test').Page) {
   await page.waitForURL(/\/(?:authorize\/interaction|studio\/dashboard)/, { timeout: 30_000 });
   if (/\/studio\/dashboard/.test(new URL(page.url()).pathname)) return;
-  if (await page.getByRole('heading', { name: 'Access unavailable' }).isVisible().catch(() => false)) {
+  const denial = page.getByRole('heading', { name: 'Access unavailable', exact: true });
+  const continuation = page.getByRole('button', { name: 'Continue with HubZero', exact: true });
+  await Promise.race([
+    denial.waitFor({ state: 'visible', timeout: 30_000 }),
+    continuation.waitFor({ state: 'visible', timeout: 30_000 }),
+  ]);
+  if (await denial.isVisible()) {
     throw new Error('INTERACTION_STATE_MISMATCH: authenticated subject lacks the expected first-party application access');
   }
-  const continuation = page.getByRole('button', { name: 'Continue with HubZero', exact: true });
-  if (!await continuation.isVisible().catch(() => false)) {
+  if (!await continuation.isVisible()) {
     const heading = await page.locator('h1').first().textContent().catch(() => null);
     throw new Error(`INTERACTION_STATE_MISMATCH: expected first-party continuation, observed heading ${JSON.stringify(heading)}`);
   }
