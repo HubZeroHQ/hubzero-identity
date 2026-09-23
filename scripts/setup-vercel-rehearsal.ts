@@ -38,11 +38,21 @@ try {
   );
   const events = new MongoSecurityEventWriter(database);
   const credentials = new CredentialService(database, client, PasswordService.create(), events);
-  const provisioned = await new ProvisioningService(database, client, credentials, events).provision({
-    name: "Synthetic Vercel Rehearsal User", email, password,
-    accountType: "internal", mustChangePassword: false, applicationIds: ["studio-rehearsal"],
-    idempotencyKey, actorSubject: "hz_01J8Y80J3QY33NZ7J7D8FV1J0M" as never,
-    reason: "Phase 6B isolated Vercel runtime rehearsal",
-  });
-  process.stdout.write(`${JSON.stringify({ database: environment.MONGODB_DATABASE, indexesCreated: indexes.create.length, indexesVerified: indexes.verified.length, application: "studio-rehearsal", accountCreated: provisioned.created, subject: provisioned.subject })}\n`);
+  const provisioner = new ProvisioningService(database, client, credentials, events);
+  const [local, domain] = email.split("@");
+  const rehearsalAccounts = [
+    { email, name: "Synthetic Vercel Rehearsal User", memberships: ["studio-rehearsal"], suffix: "primary" },
+    { email: `${local}.no-membership@${domain}`, name: "Synthetic Rehearsal No Membership", memberships: [], suffix: "no-membership" },
+    { email: `${local}.no-mapping@${domain}`, name: "Synthetic Rehearsal No Mapping", memberships: ["studio-rehearsal"], suffix: "no-mapping" },
+    { email: `${local}.disabled@${domain}`, name: "Synthetic Rehearsal Disabled", memberships: ["studio-rehearsal"], suffix: "disabled" },
+  ];
+  for (const account of rehearsalAccounts) {
+    await provisioner.provision({
+      name: account.name, email: account.email, password,
+      accountType: "internal", mustChangePassword: false, applicationIds: account.memberships,
+      idempotencyKey: `${idempotencyKey}:${account.suffix}`, actorSubject: "hz_01J8Y80J3QY33NZ7J7D8FV1J0M" as never,
+      reason: "Phase 6B isolated Vercel runtime rehearsal",
+    });
+  }
+  process.stdout.write(`${JSON.stringify({ database: environment.MONGODB_DATABASE, indexesCreated: indexes.create.length, indexesVerified: indexes.verified.length, application: "studio-rehearsal", syntheticAccounts: rehearsalAccounts.length })}\n`);
 } finally { await client.close(); }

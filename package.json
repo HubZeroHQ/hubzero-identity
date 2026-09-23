@@ -16,6 +16,7 @@
     "vercel:rehearsal:configure": "tsx scripts/configure-vercel-rehearsal.ts",
     "vercel:rehearsal:canonical": "tsx scripts/run-vercel-canonical-rehearsal.ts",
     "verify:studio-identity-rehearsal": "tsx scripts/verify-studio-identity-rehearsal.ts",
+    "verify:studio-identity-denials": "tsx scripts/verify-studio-identity-denials.ts",
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=dist/server.mjs",
     "start": "node dist/server.mjs",
     "lint": "eslint . --max-warnings=0",
