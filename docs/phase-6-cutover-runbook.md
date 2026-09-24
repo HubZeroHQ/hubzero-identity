@@ -1,9 +1,9 @@
 # Phase 7 controlled initialization and cutover runbook
 
-Status: preparation only. The production migration executor is implemented, but
-**no production migration may run until verified recovery evidence and the other
-Phase 7 stage gates are recorded and approved**. This document does not authorize
-production writes or a Studio auth-mode change.
+Status: preparation only. The production migration executor is implemented and
+the controlled production indexes were initialized on 2026-09-24, but **no
+production user migration may run until a new apply approval and the remaining
+Phase 7 stage gates are recorded**. Studio remains legacy-only.
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
 subjects and explicit Studio memberships, then adds each subject to the
@@ -86,6 +86,55 @@ ObjectIds, and CMS/Team reference integrity before declaring recovery viable.
 Never point this verification at Atlas production or an existing rehearsal
 database. An empty Identity archive may restore no collections; that matches
 the recorded pre-migration target state.
+
+### Infrastructure-write recovery and current checkpoint
+
+The older `phase7-preapply-20260924T112727Z` reference above is historical;
+it was too old for the first infrastructure write. A fresh sequential logical
+backup was created and verified by an isolated restore immediately beforehand:
+
+| Recovery metadata | Verified value |
+| --- | --- |
+| Reference | `phase7-preinfra-20260924T170010Z` |
+| Verification completed (UTC) | 2026-09-24 17:00:29 |
+| Coverage | `hubzero`, `hubzero_identity` |
+| Tools | `mongodump` and `mongorestore` 100.18.0; isolated MongoDB 8.0.32 |
+| Archives | `hubzero.archive.gz` (97,870 bytes); `hubzero_identity.archive.gz` (116 bytes) |
+| SHA-256 | Both stored and checked in restricted external `recovery-metadata.json`, not Git |
+| Restore verification | PASS; collection/index metadata, five Studio ObjectIds, and CMS/Team reference counts matched |
+
+The archives and metadata remain outside the repositories under the operator
+backup directory above. The source credentials were independently verified as
+the sole roles `readWrite@hubzero` and `readWrite@hubzero_identity`, with exact
+URI database targets and no runtime or rehearsal fallback. No production
+collection was written while creating or restoring these archives.
+
+After that recovery check, the controlled initialization created 38 required
+Identity indexes and 3 Studio OIDC indexes. The latter include the reviewed
+sparse unique `users.identitySubject` index and the two Studio OIDC handoff
+indexes. A subsequent read-only verification found 16 Identity collections,
+zero Identity users, credentials, memberships, or migration-journal entries,
+five Studio users, zero `identitySubject` mappings, and no missing required
+indexes. These index/collection creations are the **only production database
+mutations in this preparation checkpoint**. No Studio user, ObjectId, CMS or
+Team reference, session, or auth mode was changed.
+
+Production application registration and runtime promotion remain pending.
+The locally available Identity runtime `MONGODB_URI` was independently found to
+authenticate with the broad `readWriteAnyDatabase@admin` role; it must **not**
+be deployed as the production runtime credential. Provision a dedicated
+runtime credential scoped to `readWrite@hubzero_identity`, then configure a
+coherent production-only Vercel secret set and the production Studio client.
+The currently healthy `auth.hubzero.in` deployment still uses its isolated
+rehearsal configuration. Do not overwrite its secret set piecemeal or infer
+production readiness from its HTTP 200 response. No guarded five-account
+production PLAN has yet passed this checkpoint, and no production apply was
+run.
+
+Before any later production **apply**, reassess recovery freshness and take a
+new verified logical backup after the infrastructure/client setup if meaningful
+time or production state has changed. The pre-infrastructure archive is not
+automatically a sufficiently fresh pre-apply recovery point.
 
 ## Production operator sequence (not executed in preparation)
 
