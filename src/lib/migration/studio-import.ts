@@ -23,7 +23,7 @@ const sourceSchema = z.object({
   disabled: z.boolean(),
   mustChangePassword: z.boolean(),
   applicationIds: z.array(z.string().regex(/^[a-z][a-z0-9_-]{1,63}$/)).max(20),
-  actorSubject: z.string().regex(/^hz_[0-9A-HJKMNP-TV-Z]{26}$/),
+  actorSubject: z.string().regex(/^hz_[0-9A-HJKMNP-TV-Z]{26}$/).optional(),
   reason: z.string().trim().min(3).max(240),
 });
 
@@ -36,10 +36,31 @@ export class StudioLegacyImportConflictError extends Error {
   }
 }
 
+export function studioImportIdentityKey(studioUserId: string): string {
+  return sha256(`studio-source:${studioUserId.toLowerCase()}`);
+}
+
+export function studioImportFingerprint(input: Pick<StudioLegacyImportInput,
+  "studioUserId" | "name" | "email" | "passwordHash" | "disabled" | "mustChangePassword" | "applicationIds">): string {
+  const normalized = normalizeEmail(input.email);
+  const bcryptParameters = parseBcryptHash(input.passwordHash);
+  return sha256(JSON.stringify({
+    studioUserId: input.studioUserId.toLowerCase(),
+    normalizedEmail: normalized.normalizedEmail,
+    name: input.name.trim(),
+    disabled: input.disabled,
+    mustChangePassword: input.mustChangePassword,
+    applicationIds: [...new Set(input.applicationIds)].sort(),
+    bcryptVersion: bcryptParameters.version,
+    bcryptCost: bcryptParameters.cost,
+    bcryptHashFingerprint: sha256(input.passwordHash),
+  }));
+}
+
 /**
- * Phase 6's eventual apply primitive, exercised only against isolated MongoDB
- * in Phase 5. It owns the Identity-side transaction; Studio mapping writes are
- * deliberately external because the two products do not share a transaction.
+ * Identity-side transaction used by the guarded Studio migration executor.
+ * Studio mapping writes are deliberately external because the two products
+ * do not share a transaction; the executor journals and reconciles both sides.
  */
 export class StudioLegacyImportService {
   constructor(
@@ -54,19 +75,9 @@ export class StudioLegacyImportService {
     const normalized = normalizeEmail(input.email);
     const bcryptParameters = parseBcryptHash(input.passwordHash);
     const applicationIds = [...new Set(input.applicationIds)].sort() as ApplicationId[];
-    const sourceKeyHash = sha256(`studio-source:${input.studioUserId.toLowerCase()}`);
-    const fingerprint = sha256(JSON.stringify({
-      studioUserId: input.studioUserId.toLowerCase(),
-      normalizedEmail: normalized.normalizedEmail,
-      name: input.name,
-      disabled: input.disabled,
-      mustChangePassword: input.mustChangePassword,
-      applicationIds,
-      bcryptVersion: bcryptParameters.version,
-      bcryptCost: bcryptParameters.cost,
-      bcryptHashFingerprint: sha256(input.passwordHash),
-    }));
-    const actor = input.actorSubject as IdentitySubject;
+    const sourceKeyHash = studioImportIdentityKey(input.studioUserId);
+    const fingerprint = studioImportFingerprint(input);
+    const actor = input.actorSubject as IdentitySubject | undefined;
 
     try {
       return await withRequiredTransaction(this.client, async (session) => {

@@ -36,6 +36,10 @@ export const identityIndexManifest: readonly CollectionIndexManifest[] = [
     { key: { targetSubject: 1, occurredAt: -1 }, name: "subject_timeline" },
     { key: { type: 1, occurredAt: -1 }, name: "event_type_timeline" },
   ] },
+  { collection: "studio_migration_journal", indexes: [
+    { key: { sourceStudioUserId: 1, step: 1 }, name: "uniq_source_step", unique: true },
+    { key: { runId: 1, occurredAt: 1 }, name: "by_run_time" },
+  ] },
   { collection: "identity_rate_limits", indexes: [
     { key: { expiresAt: 1 }, name: "expire_rate_limits", expireAfterSeconds: 0 },
     { key: { namespace: 1, updatedAt: -1 }, name: "namespace_activity" },

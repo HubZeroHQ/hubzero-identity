@@ -31,6 +31,7 @@
     "account:provision": "tsx scripts/provision-account.ts",
     "migration:studio:rehearse": "tsx scripts/rehearse-studio-migration.ts",
     "migration:studio:inventory": "tsx scripts/studio-production-inventory.ts",
+    "migration:studio:execute": "tsx scripts/studio-migration-executor.ts",
     "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {

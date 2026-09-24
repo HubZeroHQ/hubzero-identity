@@ -123,5 +123,7 @@ export class PasswordService {
 export function parseBcryptHash(hash: string): BcryptParameters {
   const match = bcryptHashPattern.exec(hash);
   if (!match) throw new CredentialFormatError("Malformed or unsupported bcrypt hash");
-  return { version: match[1] as "2a" | "2b", cost: Number(match[2]) };
+  const cost = Number(match[2]);
+  if (cost < 4 || cost > 31) throw new CredentialFormatError("Unsupported bcrypt cost");
+  return { version: match[1] as "2a" | "2b", cost };
 }

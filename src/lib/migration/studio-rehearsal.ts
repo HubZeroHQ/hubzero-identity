@@ -44,8 +44,8 @@ export interface StudioMigrationPlanItem {
 /**
  * Read-only inventory and dry-run planning for a controlled Studio source
  * export. It intentionally never opens a database, returns no password hash,
- * and has no apply mode; Phase 6 owns an operator-approved cross-database
- * execution command and migration journal.
+ * and has no apply mode; the guarded Phase 7 executor separately owns
+ * cross-database execution and its migration journal.
  */
 export function inspectStudioMigrationSource(rawUsers: unknown[]): {
   users: StudioMigrationSourceUser[];

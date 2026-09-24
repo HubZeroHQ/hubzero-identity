@@ -53,5 +53,7 @@ describe("password service", () => {
 
   it("rejects malformed or inconsistent credential metadata", async () => {
     await expect(service.verify({ algorithm: "bcrypt", algorithmParameters: { version: "2b", cost: 12 }, passwordHash: "$2b$broken" }, "anything long enough")).rejects.toThrow(CredentialFormatError);
+    expect(() => parseBcryptHash(`$2b$03$${"a".repeat(53)}`)).toThrow(CredentialFormatError);
+    expect(() => parseBcryptHash(`$2b$32$${"a".repeat(53)}`)).toThrow(CredentialFormatError);
   });
 });
