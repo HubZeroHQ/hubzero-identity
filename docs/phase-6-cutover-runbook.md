@@ -1,7 +1,7 @@
 # Phase 7 controlled initialization and cutover runbook
 
 Status: preparation only. The production migration executor is implemented, but
-**no production migration may run until Atlas backup/PITR evidence and the other
+**no production migration may run until verified recovery evidence and the other
 Phase 7 stage gates are recorded and approved**. This document does not authorize
 production writes or a Studio auth-mode change.
 
@@ -15,8 +15,8 @@ and Team documents remain unchanged.
 `scripts/studio-migration-executor.ts` is the **single** executor used in the
 isolated rehearsal and eventual production operation. Supported commands are
 `plan`, `apply`, `status`, `reconcile`, and `resume`. `plan` and `status` do not
-write. `apply`, `resume`, and `reconcile` require an operator-supplied Atlas
-backup/PITR reference in production. The reference is a checkpoint identifier,
+write. `apply`, `resume`, and `reconcile` require an operator-supplied verified
+recovery reference in production. The reference is a checkpoint identifier,
 not a substitute for manually verifying recoverability.
 
 All commands require a stable `--run-id`, `--expected-account-count 5`,
@@ -33,15 +33,64 @@ reading collections. It never uses runtime `MONGODB_URI` as a fallback.
 | Isolated rehearsal Studio | `STUDIO_REHEARSAL_MONGODB_URI` | `readWrite@hubzero_studio_rehearsal` |
 | Isolated rehearsal Identity | `REHEARSAL_MONGODB_URI` | `readWrite@hubzero_identity_rehearsal` |
 
-Neither production write credential is implied to exist today. Do not reuse the
-Studio runtime account or grant broader Atlas roles to make the executor run.
-Provision scoped credentials as a separate approved Phase 7 prerequisite. Never
-print, paste into docs, or commit any connection string.
+The dedicated production migration credentials were independently preflighted
+on 2026-09-24 as exactly `readWrite@hubzero` and
+`readWrite@hubzero_identity`. Recheck them before later operations. Do not
+reuse the Studio runtime account or grant broader Atlas roles. Never print,
+paste into docs, or commit any connection string.
+
+## Production logical recovery point (2026-09-24)
+
+Atlas native backup/PITR is unavailable on the current cluster tier. The
+pre-apply recovery method is therefore a pair of MongoDB Database Tools
+archives, stored under
+`Documents/HubZero/phase7-operator-backups/<recovery-reference>/` in a
+restricted operator directory outside both repositories and Git. This is a
+logical snapshot, **not PITR**: the databases
+were dumped sequentially, and later production changes are not recoverable
+from this reference. Maintain the identity/account-change freeze and confirm
+this reference is still fresh before any migration write. Production restore
+requires a separately reviewed procedure; do not blindly overwrite a live
+database.
+
+| Recovery metadata | Verified value |
+| --- | --- |
+| Reference | `phase7-preapply-20260924T112727Z` |
+| Verification completed (UTC) | 2026-09-24 11:27:46 |
+| Coverage | `hubzero`, `hubzero_identity` |
+| Tools | `mongodump` and `mongorestore` 100.18.0; isolated MongoDB 8.0.32 |
+| Archives | `hubzero.archive.gz` (97,291 bytes); `hubzero_identity.archive.gz` (116 bytes) |
+| SHA-256 | Both recorded in restricted external `recovery-metadata.json`; not copied into Git |
+| Source host | Sanitized host fingerprints recorded in external metadata |
+| Restore verification | PASS, isolated local container; remapped to `phase7_verify_studio.*` and `phase7_verify_identity.*` |
+
+The Studio restore reproduced five users (one `headAdmin`, four `admin`), zero
+invalid emails, zero existing mappings, and five structurally present bcrypt
+credentials. Source-versus-restore comparisons matched all collection counts,
+index metadata, original Studio ObjectIds, CMS/Media/DocumentVersions/
+EditorialEvents reference counts, and five Team records with no `userId`
+links. The production Identity target currently has **zero collections** and
+zero migration journal entries; its 116-byte archive and empty isolated
+restore reflect that state accurately, not an initialized schema. Source
+collection/index metadata was unchanged before and after the dumps. No
+production collection was written during backup or verification.
+
+To verify these archives again, use MongoDB Database Tools 100.18.0 or a
+compatible version. Check both SHA-256 values against the restricted external
+metadata. Start a **disposable local MongoDB instance**, then restore each
+archive with `mongorestore --archive=<archive> --gzip`, specifying
+`--nsFrom=hubzero.* --nsTo=<empty-isolated-studio-db>.*` and
+`--nsFrom=hubzero_identity.* --nsTo=<empty-isolated-identity-db>.*`,
+respectively. Verify collection counts, indexes, five original Studio
+ObjectIds, and CMS/Team reference integrity before declaring recovery viable.
+Never point this verification at Atlas production or an existing rehearsal
+database. An empty Identity archive may restore no collections; that matches
+the recorded pre-migration target state.
 
 ## Production operator sequence (not executed in preparation)
 
 Before these commands: record clean repo SHAs and known-good deployments, freeze
-identity/account mutations, manually verify an identifiable Atlas recovery point
+identity/account mutations, manually verify an identifiable recovery point
 for **both** databases, compare a fresh guarded inventory with the accepted five
 accounts, initialize/verify Identity indexes (including
 `studio_migration_journal.uniq_source_step`), verify Studio's sparse unique
@@ -124,8 +173,9 @@ migration unchanged.
 
 ## Stage gates after executor preparation
 
-1. Manually verify and record Atlas backup/PITR restore evidence for both
-   production databases. **Stop if unavailable.**
+1. Reconfirm the recorded logical recovery reference and both archive
+   checksums, archive accessibility, isolated restore result, and account-change
+   freeze. **Stop if recovery evidence is unavailable or stale.**
 2. Complete the Phase 7 pre-mutation baseline, account-change freeze, final
    guarded inventory, and source/target scoped credential/index preflight.
 3. Review the five-account plan with a second operator before `apply`.
