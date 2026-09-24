@@ -2,8 +2,9 @@
 
 Status: preparation only. Production indexes, the Studio OIDC application,
 and the canonical Identity runtime are initialized; the guarded five-account
-PLAN passed on 2026-09-24. **No production user migration may run until a new
-post-infrastructure recovery point and explicit apply approval are recorded.**
+PLAN passed on 2026-09-24. A fresh post-infrastructure logical recovery point
+has passed isolated restore verification. **No production user migration may
+run without an immediate recovery-freshness check and explicit apply approval.**
 Studio remains legacy-only.
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
@@ -176,11 +177,47 @@ CMS or Team mutation target. Post-PLAN read-only checks still found zero
 Identity users, credentials, memberships, journal entries, or Studio mappings.
 **No apply, resume, or reconcile was run.**
 
-Before any later production **apply**, take and verify a **new** logical backup
-of both databases after this infrastructure/client setup. The pre-infrastructure
-archive is acceptable for PLAN review only, not the final apply recovery point.
-Obtain explicit operator approval for apply; retain Studio legacy-only mode
-until full migration reconciliation passes.
+### Final pre-apply logical recovery point (2026-09-24)
+
+The post-infrastructure backup is stored outside both repositories and Git in
+the restricted operator backup directory:
+
+| Recovery metadata | Verified value |
+| --- | --- |
+| Reference | `phase7-final-preapply-20260924T175625Z` |
+| Restore verification completed (UTC) | 2026-09-24 17:56:39.822 |
+| Databases | `hubzero`, `hubzero_identity` |
+| Tools | `mongodump` and `mongorestore` 100.18.0; isolated MongoDB 8.0.32 |
+| Archives | `hubzero.archive.gz` (97,386 bytes); `hubzero_identity.archive.gz` (2,116 bytes) |
+| SHA-256 | Full checksums recorded and independently matched in restricted external `recovery-metadata.json`; not copied into Git |
+| Recovery type | Sequential logical backup, **not PITR** or an atomic cross-database snapshot |
+| Isolated restore | PASS; namespace-remapped into disposable local databases/container, never over production or rehearsal |
+
+Both scoped production credentials were rechecked as exactly
+`readWrite@hubzero` and `readWrite@hubzero_identity`, with explicit URI database
+targets and no runtime/rehearsal fallback. Source snapshots before and after
+the dumps matched, including collection counts, index definitions, and
+document fingerprints held only in verifier memory. Restored snapshots matched
+the source for all collections, indexes, and documents. All five original
+Studio BSON ObjectIds, representative CMS/Media/DocumentVersions/
+EditorialEvents references, and Team relationships survived the round-trip.
+The Studio restore has exactly five users (one `headAdmin`, four `admin`), zero
+`identitySubject` mappings, zero invalid/colliding normalized emails, five
+supported `$2b$` cost-12 credentials, and the sparse unique mapping index plus
+the other required OIDC indexes. The Identity restore has the enabled
+production `studio` client, all required indexes, zero users, zero credentials,
+zero memberships, and zero migration-journal entries. No source drift from
+the approved five-account PLAN was observed.
+
+The archive checksums were independently rechecked after restore. No temporary
+URI configuration file or restore container remains; the restricted backup
+folder contains the retained archives and metadata. No production database
+write was made during backup or verification. Before **apply**, the operator
+must recheck archive accessibility, both checksums, the identity/account-change
+freeze, current source state, and recovery freshness. If material state changed
+or the sequential logical point is no longer sufficiently fresh, create and
+verify another backup. Explicit operator approval for apply is still required;
+Studio remains legacy-only until full migration reconciliation passes.
 
 ## Production operator sequence (not executed in preparation)
 
