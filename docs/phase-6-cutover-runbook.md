@@ -1,11 +1,10 @@
 # Phase 7 controlled initialization and cutover runbook
 
-Status: preparation only. Production indexes, the Studio OIDC application,
-and the canonical Identity runtime are initialized; the guarded five-account
-PLAN passed on 2026-09-24. A fresh post-infrastructure logical recovery point
-has passed isolated restore verification. **No production user migration may
-run without an immediate recovery-freshness check and explicit apply approval.**
-Studio remains legacy-only.
+Status: controlled production import complete, authentication cutover not
+started. On 2026-09-24 the approved five-account APPLY, reconciliation, and
+idempotent rerun passed against the verified post-infrastructure recovery
+point. **Studio remains legacy-only. Dual mode, OIDC canaries, and session
+invalidation require the next explicit operator approval.**
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
 subjects and explicit Studio memberships, then adds each subject to the
@@ -219,7 +218,53 @@ or the sequential logical point is no longer sufficiently fresh, create and
 verify another backup. Explicit operator approval for apply is still required;
 Studio remains legacy-only until full migration reconciliation passes.
 
-## Production operator sequence (not executed in preparation)
+### Approved production migration checkpoint (2026-09-24)
+
+Explicit operator approval named recovery reference
+`phase7-final-preapply-20260924T175625Z`. Immediately before APPLY, both
+archive SHA-256 values matched the restricted external metadata, the isolated
+restore reference was still verified and approximately seven minutes old, and
+the scoped credentials independently authenticated as exactly
+`readWrite@hubzero` and `readWrite@hubzero_identity`. A read-only guarded PLAN
+again reported five `create` actions, one `headAdmin` and four `admin`, with no
+conflicts. A separate read-only comparison against freshly restored archive
+copies found no changed production source collection, document, or index; five
+Studio users still had supported `$2b$` cost-12 credentials, zero normalization
+collisions, and zero mappings. Identity still had zero users, credentials,
+memberships, and journal entries; the enabled Studio client and all required
+indexes were present.
+
+The reviewed executor used run ID `phase7-production-20260924` and the exact
+`hubzero` → `hubzero_identity` targets. APPLY created five opaque `hz_` Identity
+users, imported five current Studio bcrypt credentials, created five explicit
+Studio memberships, and added five `identitySubject` mappings to the existing
+Studio users. The first result had five `identity_imported` and five
+`studio_mapped` journal checkpoints. Immediate executor reconciliation passed
+five complete source → subject → credential → membership → mapping chains and
+added five `reconciled` checkpoints. A read-only PLAN then reported five
+`complete` actions; the supported second APPLY was a no-op: zero new users,
+zero new mappings, and 15 total distinct checkpoints.
+
+An independent read-only post-apply check found exactly five unique subjects,
+five credentials, five active Studio memberships, five one-to-one mappings,
+and all three journal steps per source account. Comparing a disposable restore
+of the approved pre-apply Studio archive with current production documents
+showed that all five original BSON ObjectIds, roles, disabled states,
+`authVersion` values, other user fields (except the additive mapping and
+`updatedAt`), and full CMS/Team documents were unchanged. No manual MongoDB
+repair or resume was needed.
+
+After import, Identity live/ready/discovery/JWKS returned 204/200/200/200;
+discovery remained canonical and JWKS retained the public production signing
+key. Production Studio still served its legacy email/password form (HTTP 200)
+and did not show the OIDC login action. No production password was supplied to
+the operator, so a successful legacy credential login was **not** performed in
+this checkpoint; the deployed legacy path and configuration were unchanged.
+No OIDC canary, auth-mode change, or session invalidation occurred. Retain the
+Studio bcrypt hashes, additive mappings, migration journal, and recovery
+archives as rollback material. Stop here pending separate dual-mode approval.
+
+## Production operator sequence (historical import commands; do not rerun after cutover)
 
 Before these commands: record clean repo SHAs and known-good deployments, freeze
 identity/account mutations, manually verify an identifiable recovery point
@@ -303,19 +348,15 @@ unsupported or conflicting source states, and rejection of a conflicting run
 ID. The test compared CMS and Team fixture documents before and after
 migration unchanged.
 
-## Stage gates after executor preparation
+## Next stage gate
 
-1. Reconfirm the recorded logical recovery reference and both archive
-   checksums, archive accessibility, isolated restore result, and account-change
-   freeze. **Stop if recovery evidence is unavailable or stale.**
-2. Complete the Phase 7 pre-mutation baseline, account-change freeze, final
-   guarded inventory, and source/target scoped credential/index preflight.
-3. Review the five-account plan with a second operator before `apply`.
-4. Run `apply`, `reconcile`, and the zero-write rerun while Studio remains
-   legacy-only. Stop on any mismatch; use `status`/`resume` for interruption.
-5. Only after full reconciliation, follow the separately accepted dual-mode
-   canary, five-user verification, OIDC-only cutover, session invalidation,
-   and rollback-window stages. Retain Studio bcrypt hashes and additive
-   Identity records as rollback material; do not remove them automatically.
+The recovery, preflight, production PLAN, APPLY, reconciliation, and no-op
+rerun above are complete. **Do not rerun the import executor after users begin
+authenticating and credentials upgrade to Argon2id.** The next separately
+approved stage is dual-mode deployment and a production OIDC canary, followed
+only after its own gates by five-user verification, OIDC-only cutover, session
+invalidation, and the rollback window. Preserve Studio bcrypt hashes and the
+additive Identity records as rollback material; do not remove them
+automatically.
 
 Fitness is outside this migration. No Fitness client or membership is created.
