@@ -1,9 +1,10 @@
 # Phase 7 controlled initialization and cutover runbook
 
-Status: preparation only. The production migration executor is implemented and
-the controlled production indexes were initialized on 2026-09-24, but **no
-production user migration may run until a new apply approval and the remaining
-Phase 7 stage gates are recorded**. Studio remains legacy-only.
+Status: preparation only. Production indexes, the Studio OIDC application,
+and the canonical Identity runtime are initialized; the guarded five-account
+PLAN passed on 2026-09-24. **No production user migration may run until a new
+post-infrastructure recovery point and explicit apply approval are recorded.**
+Studio remains legacy-only.
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
 subjects and explicit Studio memberships, then adds each subject to the
@@ -115,26 +116,71 @@ sparse unique `users.identitySubject` index and the two Studio OIDC handoff
 indexes. A subsequent read-only verification found 16 Identity collections,
 zero Identity users, credentials, memberships, or migration-journal entries,
 five Studio users, zero `identitySubject` mappings, and no missing required
-indexes. These index/collection creations are the **only production database
-mutations in this preparation checkpoint**. No Studio user, ObjectId, CMS or
-Team reference, session, or auth mode was changed.
+indexes. At that checkpoint, index/collection creation was the only production
+database mutation. No Studio user, ObjectId, CMS or Team reference, session,
+or auth mode was changed.
 
-Production application registration and runtime promotion remain pending.
-The locally available Identity runtime `MONGODB_URI` was independently found to
-authenticate with the broad `readWriteAnyDatabase@admin` role; it must **not**
-be deployed as the production runtime credential. Provision a dedicated
-runtime credential scoped to `readWrite@hubzero_identity`, then configure a
-coherent production-only Vercel secret set and the production Studio client.
-The currently healthy `auth.hubzero.in` deployment still uses its isolated
-rehearsal configuration. Do not overwrite its secret set piecemeal or infer
-production readiness from its HTTP 200 response. No guarded five-account
-production PLAN has yet passed this checkpoint, and no production apply was
-run.
+### Production runtime, client, and PLAN checkpoint (2026-09-24)
 
-Before any later production **apply**, reassess recovery freshness and take a
-new verified logical backup after the infrastructure/client setup if meaningful
-time or production state has changed. The pre-infrastructure archive is not
-automatically a sufficiently fresh pre-apply recovery point.
+`IDENTITY_RUNTIME_MONGODB_URI` was independently checked: exact URI database
+`hubzero_identity`, sole effective role `readWrite@hubzero_identity`, no
+fallback. The separate broad `readWriteAnyDatabase@admin` local runtime URI
+was **not** used or deployed. The existing migration credentials retained
+their exact scoped roles. All Vercel Production Identity variables were
+replaced as one coherent production-only set, using fresh HMACs, a fresh ES256
+key (`phase7-production-a-20260924` active), the scoped runtime URI, and a
+fresh production Studio client secret. Only variable names and the public
+`kid` are recorded here. Studio's Production Vercel environment received the
+matching OIDC issuer, client ID, exact callback, client secret, and independent
+transaction key; `STUDIO_AUTH_MODE` was not changed and Studio was not
+redeployed. No rehearsal or production secret value is recorded in Git.
+
+The guarded `application:studio:register:production` command registered the
+enabled, first-party, confidential `studio` application with client ID
+`hubzero-studio`, secret reference `studio-production`, and sole exact redirect
+`https://hubzero.in/studio/oidc/callback`. The callback route exists in the
+deployed Studio implementation. Registration was the only additional
+intentional production infrastructure database write. Its second invocation
+recognized the same client
+with zero writes. It created no users or memberships.
+
+Identity deployment `dpl_B4Wnt2VM3rttjuES6ZHWV9RbfHX2` was built as a staged
+Production deployment and promoted to `auth.hubzero.in` only after the build
+passed. The prior deployment `dpl_3co4Hv8ox3iYEs49MtxCtJ6N9TRu` was recorded
+before promotion. On the canonical domain, TLS verification succeeded;
+`/health/live` returned 204 and `/health/ready`, discovery, and JWKS returned
+200. Discovery reported issuer `https://auth.hubzero.in` and authorization,
+token, and JWKS endpoints on that origin. JWKS exposed only public ES256 key
+`phase7-production-a-20260924`. An unauthenticated `prompt=none` request for
+the production Studio client returned `login_required` to the exact Studio
+callback, while the rehearsal client was rejected. Together with the scoped
+runtime credential installation and the production-only application record,
+this distinguishes the deployed `hubzero_identity` runtime from the old
+rehearsal database. A protected noncanonical deployment request reached the
+Function and returned 421. A synthetic invalid-session cleanup request on the
+canonical domain set `__Host-hz_session` with Secure, HttpOnly, SameSite=Lax,
+Path=/, and no Domain; no cookie value was recorded. There are no production
+users yet, so a real login cookie was not issued in this preparation stage.
+
+The guarded production PLAN used `--environment production`,
+`--confirm-production`, `--expected-account-count 5`, run ID
+`phase7-production-20260924`, and recovery reference
+`phase7-preinfra-20260924T170010Z`. It independently selected the read-only
+`read@hubzero` Studio inventory credential and `readWrite@hubzero_identity`
+target credential, with no runtime/rehearsal fallback. Result: five source
+accounts (one `headAdmin`, four `admin`), five `create` actions, zero resume or
+conflict actions. The reviewed executor maps each create action to one opaque
+Identity subject, imported current bcrypt credential, explicit Studio
+membership, and additive mapping to the unchanged Studio ObjectId. It has no
+CMS or Team mutation target. Post-PLAN read-only checks still found zero
+Identity users, credentials, memberships, journal entries, or Studio mappings.
+**No apply, resume, or reconcile was run.**
+
+Before any later production **apply**, take and verify a **new** logical backup
+of both databases after this infrastructure/client setup. The pre-infrastructure
+archive is acceptable for PLAN review only, not the final apply recovery point.
+Obtain explicit operator approval for apply; retain Studio legacy-only mode
+until full migration reconciliation passes.
 
 ## Production operator sequence (not executed in preparation)
 
