@@ -177,10 +177,58 @@ artifact exists in the repository.
 | Secret handling and no production mutation | PASS |
 | Fitness | NOT APPLICABLE |
 
-**Phase 7 gate: NO-GO.**
+## Final isolated Studio to Identity browser evidence
 
-The only remaining required work is the real isolated Studio-to-Identity browser
-proof. Concurrent replay stress, exhaustive distributed persistence, live
-signing-key rotation, live Vercel rollback, and an exhaustive callback-negative
-browser matrix remain explicitly tracked as post-Phase-7 operational hardening;
-they are not waived or claimed as executed.
+The actual Studio application ran in rehearsal `dual` mode against only
+`hubzero_studio_rehearsal`; the real Vercel Identity provider used only
+`hubzero_identity_rehearsal`. The deployed provider and local Studio callback
+completed the browser flow without production data or credentials.
+
+Legacy and OIDC paths both resolved the fixed existing synthetic Studio ObjectId.
+The OIDC path used the same mapped Identity subject, created no second Studio
+user, and left Studio as the authority for role and capability data. Identity
+email was changed through the supported isolated tool while retaining that
+subject; a second real OIDC login resolved the same Studio ObjectId with no
+mapping rewrite or email fallback.
+
+| Existing-session or logout scenario | Result |
+| --- | --- |
+| Role change | PASS — the same Studio session rendered current server-side member role, not its prior admin JWT role. |
+| `authVersion` increment | PASS — the old product session expired and returned cleanly to Studio login. |
+| Disable after sign-in | PASS — the old product session expired and denied continued Studio use. |
+| Studio logout | PASS — Studio session ended; Identity SSO remained and established a new Studio session without another password prompt. |
+| Identity logout | PASS — Identity SSO ended; the existing Studio session followed Studio's independent lifecycle, and a new authorization required authentication. |
+
+The `authVersion` browser proof found one genuine Studio defect: Node-side
+current-user resolution rejected the stale JWT, but edge middleware still saw
+its valid signature and redirected `/studio/login` back to the dashboard.
+`session-invalidated` now expires the Studio Auth.js session cookie before
+redirecting to login. This product-session cleanup path does not contact
+Identity or alter production data. Focused regression coverage passes.
+
+Identity and Studio cookies remained separate by host and application.
+Identity retained its canonical host-only `__Host-hz_session`; Studio owned its
+Auth.js cookie. Neither cookie authenticated the other product, and OIDC
+ID/access tokens were not retained as Studio browser sessions.
+
+The earlier interaction-page delay was a harness race: it inspected the page
+before the supported continuation or denial form rendered. The committed
+verifier now waits for an exact supported state; no Identity product behavior
+changed for that harness issue.
+
+## Final gate recomputation
+
+| Required gate | Status |
+| --- | --- |
+| Production inventory, normalization, credential compatibility, ObjectId and Team preservation | PASS |
+| Manifest, production-shaped rehearsal, recovery, reconciliation, and rollback | PASS |
+| Vercel hosting, canonical TLS/issuer/cookie, deployed Authorization Code + PKCE, and replay rejection | PASS |
+| Real Studio and Identity runtimes; same ObjectId; SSO; critical denials | PASS |
+| Email independence | PASS |
+| Existing-session role, `authVersion`, and disabled-state freshness | PASS |
+| Studio and Identity logout boundaries; cookie/token separation | PASS |
+| High/critical authentication dependency findings; secret handling; production-mutation boundary | PASS |
+| Concurrent replay stress, exhaustive distributed persistence, live A-to-B signing rotation, live rollback, exhaustive callback-negative matrix | NOT APPLICABLE (post-Phase-7 operational hardening) |
+| Fitness | NOT APPLICABLE |
+
+**Phase 7 gate: GO.**
