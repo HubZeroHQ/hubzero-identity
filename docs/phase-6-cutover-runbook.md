@@ -399,6 +399,58 @@ counts. No Studio session invalidation, OIDC-only cutover, or other-user test
 occurred. No migrated records were deleted. Do not interpret this checkpoint
 as authorization for another dual deployment or canary.
 
+### Stale-interaction classification and Identity repair (2026-09-25)
+
+Sanitized runtime logs place an Identity authorization continuation and
+authorization-code exchange (token endpoint HTTP 200) before the later
+`SessionNotFound` responses. Studio callback and finalize redirects also ran,
+but the browser had an existing Studio session and multiple interaction tabs.
+A dashboard HTTP 200 therefore did **not** prove a fresh Studio product session;
+the first canary remains unaccepted. The provider's `SessionNotFound` extends
+`InvalidRequest` (HTTP 400). Its interaction state is single-use; a stale tab,
+Back, Refresh, or duplicate continuation can encounter an already-consumed
+interaction. The exact missing provider cookie/interaction/session subcase is
+not present in production logs.
+
+The Identity Node wrapper previously caught that expected invalid-request
+condition and returned generic HTTP 503. The narrow repair classifies only
+typed provider `InvalidRequest` errors with a 4xx provider status as client
+errors. `SessionNotFound` receives safe restart guidance: return to Studio and
+begin again. Unexpected errors, database/adapter failures, and provider 5xx
+remain HTTP 503. No consumed state is recreated and no automatic retry occurs.
+The response and bounded log classification contain no interaction identifiers
+or protocol secrets. Unit tests cover the typed 4xx/5xx boundary; isolated
+browser tests cover clean authorization, stale parallel tab, browser Back,
+Refresh, duplicate continuation, unchanged code-replay rejection, and no
+additional authorization-code/grant/Identity-session state from stale submits.
+
+Identity-only deployment `dpl_8Nh5Qos4BfWH5LQ616RzbR5TPV3H` is READY and
+aliased to `auth.hubzero.in`. Live/ready/discovery/JWKS returned 204/200/200/200;
+discovery retained the canonical issuer and advertised endpoints. A synthetic
+cookie-free GET for a nonexistent interaction returned the safe restart text
+and HTTP 400, and the runtime log classified it as `stale_interaction` without
+detected secret leakage. This exercises the same typed provider error mapping,
+but **not** the exact authenticated consumed-interaction browser path; that
+production proof remains deferred to the next approved canary. Read-only
+production counts remained five Studio users, five mappings, five Identity
+users, five password credentials, five active Studio memberships, and 15
+journal checkpoints; the production Studio client remained enabled. Studio
+remained on known-good legacy deployment `dpl_5UM9JBri35EUSunStsL3vSXetPrw`,
+with its legacy form visible and OIDC login action hidden. No production user
+or migration record was mutated during this repair. Do not use a real account
+or manually alter MongoDB merely to trigger the stale path.
+
+Before another canary, confirm the repaired Identity deployment is healthy and
+Studio remains legacy-only. Obtain fresh explicit approval for dual mode. Use
+a brand-new isolated/incognito browser context with no Studio or Identity
+session, exactly one Studio tab and one OIDC interaction. Do not use Back,
+Refresh, duplicate tabs, or a saved interaction URL during sign-in. The
+operator enters the password directly in the browser. Wait for the entire
+redirect chain, then prove a **new** Studio product session through current
+server-side user resolution to the pre-recorded existing ObjectId and role,
+not merely a dashboard HTTP 200. Verify representative CMS ownership and
+independent Identity/Studio sessions without recording cookie or token values.
+
 Final OIDC-only Studio UX is a separate acceptance gate, not part of the
 dual-mode canary. After all five users pass in dual mode and the operator
 explicitly approves cutover, `/studio/login` must show an explicit **Continue
