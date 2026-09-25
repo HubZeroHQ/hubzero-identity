@@ -1,10 +1,10 @@
 # Phase 7 controlled initialization and cutover runbook
 
-Status: controlled production import complete, authentication cutover not
-started. On 2026-09-24 the approved five-account APPLY, reconciliation, and
-idempotent rerun passed against the verified post-infrastructure recovery
-point. **Studio remains legacy-only. Dual mode, OIDC canaries, and session
-invalidation require the next explicit operator approval.**
+Status: controlled production import complete; the first dual-mode canary was
+attempted on 2026-09-25 and was not accepted. On 2026-09-24 the approved
+five-account APPLY, reconciliation, and idempotent rerun passed against the
+verified post-infrastructure recovery point. **Studio is restored to
+legacy-only. No OIDC-only cutover or session invalidation occurred.**
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
 subjects and explicit Studio memberships, then adds each subject to the
@@ -353,10 +353,60 @@ migration unchanged.
 The recovery, preflight, production PLAN, APPLY, reconciliation, and no-op
 rerun above are complete. **Do not rerun the import executor after users begin
 authenticating and credentials upgrade to Argon2id.** The next separately
-approved stage is dual-mode deployment and a production OIDC canary, followed
-only after its own gates by five-user verification, OIDC-only cutover, session
-invalidation, and the rollback window. Preserve Studio bcrypt hashes and the
-additive Identity records as rollback material; do not remove them
-automatically.
+approved stage is another controlled dual-mode canary after investigating the
+browser/session-state failure below. Five-user verification, OIDC-only cutover,
+session invalidation, and the rollback window require their own later gates.
+Preserve Studio bcrypt hashes and the additive Identity records as rollback
+material; do not remove them automatically.
+
+### First production dual-mode canary attempt (2026-09-25)
+
+The pre-deploy read-only gate found 5 imported Identity users, 5 active Studio
+memberships, 5 additive mappings, and all 15 journal checkpoints. All five
+executor PLAN items were complete; the production Studio client was enabled;
+Identity live/ready/discovery/JWKS were healthy. The headAdmin's pre-existing
+Studio ObjectId and subject mapping were recorded without publishing PII.
+The known-good legacy Studio deployment was
+`dpl_5UM9JBri35EUSunStsL3vSXetPrw`.
+
+The approved `STUDIO_AUTH_MODE=dual` and
+`STUDIO_OIDC_SHOW_LOGIN_ACTION=true` settings were deployed as
+`dpl_4FmUA8dQ57aJYUxH8LfRSJ59CMfa`. Its production login page exposed
+both the legacy form and Continue with HubZero. Only the headAdmin was used
+as canary; the operator entered the current password directly in the browser.
+Identity sign-in succeeded and automatically upgraded this imported Identity
+credential from bcrypt to Argon2id. The Studio bcrypt rollback credential was
+not changed. The browser reached the first-party continuation page.
+
+The browser then encountered a blocked/stale continuation. Sanitized Identity
+runtime logs classified subsequent continuation attempts as `SessionNotFound`
+with HTTP 503. Studio logs also show an OIDC callback, finalize, and dashboard
+HTTP 200 before those failed attempts. Multiple browser interaction tabs were
+present, so the later error may have been a repeat submission of an already
+completed interaction. This is **not** evidence that the finished Studio
+session resolved to the expected ObjectId and role; the canary is therefore
+**not accepted**. No second account or fresh canary was attempted. The exact
+browser/session-state cause remains to be investigated before retrying.
+
+Per the failure contract, the known-good legacy deployment was promoted back
+to `hubzero.in`, and future Production environment settings were restored to
+`STUDIO_AUTH_MODE=legacy` and `STUDIO_OIDC_SHOW_LOGIN_ACTION=false`. The live
+login page returned HTTP 200 with the legacy form and no OIDC action. A
+post-attempt read-only check found the same five Studio users, five Identity
+users, five active memberships, unchanged headAdmin ObjectId, subject mapping,
+role, disabled state, `authVersion`, and representative CMS/Team reference
+counts. No Studio session invalidation, OIDC-only cutover, or other-user test
+occurred. No migrated records were deleted. Do not interpret this checkpoint
+as authorization for another dual deployment or canary.
+
+Final OIDC-only Studio UX is a separate acceptance gate, not part of the
+dual-mode canary. After all five users pass in dual mode and the operator
+explicitly approves cutover, `/studio/login` must show an explicit **Continue
+with HubZero** action without auto-redirecting. It must not show or accept the
+Studio email/password form; credentials are entered only at
+`https://auth.hubzero.in`. Keep the legacy credential data and implementation
+solely for the approved rollback window, without deleting Studio bcrypt hashes.
+Returning to legacy mode may restore the old login UI if rollback is needed.
+During dual-mode verification, both login paths remain available.
 
 Fitness is outside this migration. No Fitness client or membership is created.
