@@ -8,6 +8,7 @@ import { resolveIdentitySessionToken } from "@/lib/auth/session-resolution";
 import { sessionCookieName } from "@/lib/auth/cookies";
 import { identityApplicationsCollection, identityCredentialsCollection, identityMembershipsCollection } from "@/lib/db/collections";
 import type { ApplicationDocument } from "@/lib/db/documents";
+import { oidcNodeErrorResponse, staleInteractionMessage } from "@/lib/oidc/error-response";
 
 /**
  * Handles only the Node-native OIDC and health surface. It is deliberately
@@ -84,12 +85,9 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
     // server-side classification for an operator investigating a failed OIDC
     // request. In particular, never log request parameters: they may include
     // authorization codes, client assertions, or other protocol secrets.
-    const failure = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : undefined;
-    console.error("oidc_request_failed", {
-      errorName: typeof failure?.name === "string" ? failure.name : "UnknownError",
-      errorCode: typeof failure?.code === "string" ? failure.code : undefined,
-    });
-    if (!response.headersSent) send(response, 503, runtimeSafeError(environment, error));
+    const failure = oidcNodeErrorResponse(error);
+    console.error("oidc_request_failed", { classification: failure.classification, status: failure.status });
+    if (!response.headersSent) send(response, failure.status, failure.message);
     return true;
   }
 }
@@ -147,7 +145,7 @@ async function beginInteraction(request: IncomingMessage, response: ServerRespon
 async function finishInteraction(request: IncomingMessage, response: ServerResponse, oidc: OidcProviderRuntime, continuations: OidcInteractionContinuationService, uid: string) {
   if (request.headers.origin && request.headers.origin !== "null" && request.headers.origin !== new URL(oidc.runtime.environment.IDENTITY_ISSUER_URL).origin) return send(response, 403, "Invalid request origin");
   const continuation = await continuations.find(parseCookie(request.headers.cookie, oidcContinuationCookieName(oidc.runtime.environment.APP_ENV)), uid);
-  if (!continuation) return send(response, 400, "Authorization request expired");
+  if (!continuation) return send(response, 400, staleInteractionMessage);
   const identity = await resolveIdentitySessionToken(oidc.runtime, parseCookie(request.headers.cookie, sessionCookieName(oidc.runtime.environment)));
   if (!identity) return redirect(response, "/sign-in?returnTo=%2Fauthorize%2Finteraction");
   const credential = await identityCredentialsCollection(oidc.runtime.database).findOne({ identitySubject: identity.user.subject, type: "password" }, { projection: { mustChangePassword: 1 } });
@@ -191,10 +189,4 @@ function redirect(response: ServerResponse, location: string) {
   response.statusCode = 303;
   response.setHeader("Location", location);
   response.end();
-}
-
-function runtimeSafeError(runtimeEnvironment: { APP_ENV: string }, error: unknown) {
-  void runtimeEnvironment;
-  void error;
-  return "HubZero Identity is temporarily unavailable";
 }

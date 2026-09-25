@@ -90,6 +90,55 @@ describe("HubZero Identity OIDC provider and first-party SSO", () => {
     await context.close();
   });
 
+  it("rejects stale tab, Back, Refresh, and duplicate continuation without issuing another code", async () => {
+    const context = await browser.newContext();
+    const primary = await context.newPage();
+    await primary.goto(clientA.origin);
+    await primary.getByRole("link", { name: "Continue with HubZero" }).click();
+    await signIn(primary, "oidc-user@e2e.invalid", password);
+    await expect(primary).toHaveURL(/\/authorize\/interaction/);
+
+    const staleTab = await context.newPage();
+    const backTab = await context.newPage();
+    const refreshTab = await context.newPage();
+    for (const tab of [staleTab, backTab, refreshTab]) {
+      await tab.goto(`${issuer}/authorize/interaction`);
+      await expect(tab.getByRole("button", { name: "Continue with HubZero" })).toBeVisible();
+    }
+    await backTab.goto("about:blank");
+
+    const before = await oidcStateCounts(database);
+    await primary.getByRole("button", { name: "Continue with HubZero" }).click();
+    await expect(primary).toHaveURL(clientA.origin);
+    await expect(primary.getByText(`Subject: ${subject}`)).toBeVisible();
+    const completed = await oidcStateCounts(database);
+    vitestExpect(completed.codes).toBe(before.codes + 1);
+
+    const assertStale = async (tab: Page) => {
+      const response = tab.waitForResponse((item) => item.url().includes("/interaction/") && item.url().endsWith("/continue"));
+      await tab.getByRole("button", { name: "Continue with HubZero" }).click();
+      const rejected = await response;
+      vitestExpect(rejected.status()).toBe(400);
+      vitestExpect(await rejected.text()).toBe("That sign-in request is no longer valid. Return to Studio and start again.");
+      vitestExpect(await oidcStateCounts(database)).toEqual(completed);
+    };
+
+    await assertStale(staleTab);
+    await backTab.goBack();
+    await expect(backTab).toHaveURL(/\/authorize\/interaction/);
+    await assertStale(backTab);
+    await refreshTab.reload();
+    await assertStale(refreshTab);
+
+    // Resubmitting the same consumed interaction directly remains single-use.
+    const duplicate = await context.request.post(staleTab.url());
+    vitestExpect(duplicate.status()).toBe(400);
+    vitestExpect(await oidcStateCounts(database)).toEqual(completed);
+    const replay = await clientA.replayLastCode();
+    vitestExpect(replay.status).toBe(400);
+    await context.close();
+  });
+
   it("rejects code replay, invalid redirects, prompt=none after SSO, and membership removal", async () => {
     const context = await browser.newContext(); const page = await context.newPage();
     await page.goto(clientA.origin); await page.getByRole("link", { name: "Continue with HubZero" }).click(); await signIn(page, "oidc-user@e2e.invalid", password); await page.getByRole("button", { name: "Continue with HubZero" }).click(); await expect(page).toHaveURL(clientA.origin);
@@ -148,6 +197,14 @@ function exchange(input: { issuer: string; clientId: string; clientSecret: strin
 }
 function cookie(header: string | undefined, name: string) { return header?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1) ?? null; }
 function sha256url(value: string) { return createHash("sha256").update(value).digest("base64url"); }
+async function oidcStateCounts(database: Db) {
+  const [codes, grants, sessions] = await Promise.all([
+    database.collection("oidc_authorizationcode_artifacts").countDocuments(),
+    database.collection("oidc_grant_artifacts").countDocuments(),
+    database.collection("identity_sessions").countDocuments(),
+  ]);
+  return { codes, grants, sessions };
+}
 function reply(response: import("node:http").ServerResponse, status: number, body: string, type = "text/plain") { response.statusCode = status; response.setHeader("content-type", type); response.end(body); }
 async function signIn(page: Page, email: string, secret: string) { await page.getByRole("textbox", { name: "Email" }).fill(email); await page.getByRole("textbox", { name: "Password" }).fill(secret); await page.getByRole("button", { name: "Continue" }).click(); }
 function mongoUriWithDatabase(uri: string, name: string): string { return uri.replace("/?", `/${name}?`); }
