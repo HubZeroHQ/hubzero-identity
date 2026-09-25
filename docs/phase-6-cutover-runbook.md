@@ -1,10 +1,11 @@
 # Phase 7 controlled initialization and cutover runbook
 
-Status: controlled production import complete; the first dual-mode canary was
-attempted on 2026-09-25 and was not accepted. On 2026-09-24 the approved
+Status: controlled production import complete and one clean-browser headAdmin
+dual-mode OIDC canary accepted on 2026-09-25. On 2026-09-24 the approved
 five-account APPLY, reconciliation, and idempotent rerun passed against the
-verified post-infrastructure recovery point. **Studio is restored to
-legacy-only. No OIDC-only cutover or session invalidation occurred.**
+verified post-infrastructure recovery point. **Studio remains in dual mode
+with legacy login available. No OIDC-only cutover or session invalidation
+occurred.**
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
 subjects and explicit Studio memberships, then adds each subject to the
@@ -350,14 +351,15 @@ migration unchanged.
 
 ## Next stage gate
 
-The recovery, preflight, production PLAN, APPLY, reconciliation, and no-op
-rerun above are complete. **Do not rerun the import executor after users begin
-authenticating and credentials upgrade to Argon2id.** The next separately
-approved stage is another controlled dual-mode canary after investigating the
-browser/session-state failure below. Five-user verification, OIDC-only cutover,
-session invalidation, and the rollback window require their own later gates.
-Preserve Studio bcrypt hashes and the additive Identity records as rollback
-material; do not remove them automatically.
+The recovery, preflight, production PLAN, APPLY, reconciliation, no-op rerun,
+and one clean-browser headAdmin dual-mode canary are complete. **Do not rerun
+the import executor after users begin authenticating and credentials upgrade
+to Argon2id.** The remaining four production users have not been tested; each
+must be physically available to enter their own password before their
+separately approved verification. OIDC-only cutover, session invalidation,
+and the rollback window remain later gates. Preserve Studio bcrypt hashes and
+the additive Identity records as rollback material; do not remove them
+automatically.
 
 ### First production dual-mode canary attempt (2026-09-25)
 
@@ -440,16 +442,72 @@ with its legacy form visible and OIDC login action hidden. No production user
 or migration record was mutated during this repair. Do not use a real account
 or manually alter MongoDB merely to trigger the stale path.
 
-Before another canary, confirm the repaired Identity deployment is healthy and
-Studio remains legacy-only. Obtain fresh explicit approval for dual mode. Use
-a brand-new isolated/incognito browser context with no Studio or Identity
-session, exactly one Studio tab and one OIDC interaction. Do not use Back,
-Refresh, duplicate tabs, or a saved interaction URL during sign-in. The
-operator enters the password directly in the browser. Wait for the entire
-redirect chain, then prove a **new** Studio product session through current
-server-side user resolution to the pre-recorded existing ObjectId and role,
-not merely a dashboard HTTP 200. Verify representative CMS ownership and
-independent Identity/Studio sessions without recording cookie or token values.
+The retry protocol required the repaired Identity deployment to be healthy
+while Studio was still legacy-only, followed by fresh explicit approval for
+dual mode. It required a brand-new isolated browser context with no Studio or
+Identity session, exactly one Studio tab and one OIDC interaction, and no Back,
+Refresh, duplicate tabs, or saved interaction URL. The operator would enter
+the password directly in the browser. Acceptance required a **new** Studio
+product session through current server-side user resolution to the
+pre-recorded ObjectId and role, not merely a dashboard HTTP 200, plus
+representative CMS ownership and independent sessions without recording
+cookie or token values. The accepted execution is recorded below.
+
+### Accepted clean-browser headAdmin canary (2026-09-25)
+
+The operator approved autonomous retry of this one account after the
+stale-interaction repair. Identity deployment
+`dpl_8Nh5Qos4BfWH5LQ616RzbR5TPV3H` remained healthy. Studio's known-good
+legacy rollback deployment remained
+`dpl_5UM9JBri35EUSunStsL3vSXetPrw`. The two approved Production flags alone
+were set to `STUDIO_AUTH_MODE=dual` and
+`STUDIO_OIDC_SHOW_LOGIN_ACTION=true`; Studio deployment
+`dpl_H83Z3vezivk39VmwLFetzXZijiTw` became READY at `hubzero.in`. The live
+login page displayed both legacy credentials and Continue with HubZero.
+
+The verifier launched a new, non-persistent Chromium context with zero
+Identity/Studio cookies, no Studio Auth.js session, and one Studio tab. The
+operator entered credentials directly in the browser; no password or token
+was captured. A single Authorization Code + PKCE handoff traversed Studio
+start, canonical Identity authorization and first-party continuation, Studio
+callback, finalize, and dashboard. Sanitized Identity runtime metadata showed
+one successful token endpoint POST. The new context then held distinct
+host-scoped Identity `__Host-hz_session` and Studio
+`__Secure-authjs.session-token` cookies. The latter was absent at the start.
+
+Studio's authenticated session endpoint resolved the pre-recorded, existing
+headAdmin Studio ObjectId, current `headAdmin` role, and unchanged
+`authVersion`. A newly consumed one-time MongoDB handoff matched both the
+expected Identity subject and the same Studio ObjectId. The authenticated
+profile returned HTTP 200 and rendered its heading; the headAdmin-only user
+management route and an owned blueprint detail were accessible. Read-only
+before/after checks retained five Studio users and five mappings, identical
+subject/ObjectId binding, role, enabled state and `authVersion`, representative
+CMS ownership/version counts, and unchanged Team document fingerprint. There
+was no duplicate Studio user or email fallback. Identity's first-party
+session and Studio's product session remained independent; ID/access tokens
+were not browser product sessions.
+
+The first clean-context attempt stopped at a verifier assertion that checked
+the profile heading immediately after `domcontentloaded`. That attempt did
+not record the profile HTTP status, so the precise reason for the failed
+assertion is not proven; the immediately checked, server-rendered heading was
+a concrete verifier race. The temporary verifier was changed to wait for the
+exact heading and record only HTTP status/path/visibility. In the next *new*
+empty context, the profile returned HTTP 200 at `/studio/profile` with the
+heading visible and the complete canary passed. There is no evidence of a
+product authorization defect. The temporary verifier was removed after use;
+no Identity or Studio product source change or redeployment was required for
+this retry.
+
+Post-canary checks: Identity live/ready/discovery/JWKS returned
+204/200/200/200. Studio's login page returned 200 with both paths visible.
+The Studio readiness endpoint returned 401 without a Studio session. Sampled
+Studio and Identity deployment logs
+showed no 5xx or high-confidence secret-pattern hits. Studio remains dual,
+legacy login remains available, and neither OIDC-only mode nor mass session
+invalidation has occurred. Stop here; do not test the other four accounts or
+cut over without a new operator approval.
 
 Final OIDC-only Studio UX is a separate acceptance gate, not part of the
 dual-mode canary. After all five users pass in dual mode and the operator
