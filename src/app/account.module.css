@@ -42,7 +42,7 @@
 .applicationDetail strong { font-size: 20px; font-weight: 500; }
 .applicationDetail p { margin: 6px 0 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
 .meta { display: grid; justify-items: end; gap: 14px; }
-.editor { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1.2fr); gap: 40px; padding: 4px 0 32px; }
+.editor { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 40px; padding: 4px 0 32px; }
 .editor h2 { font-size: 20px; margin: 0 0 12px; font-weight: 500; }
 .editor p { margin: 0; color: var(--muted); font-size: 15px; }
 .editor form p { font-size: 14px; }

@@ -4,7 +4,7 @@ import styles from "./auth-shell.module.css";
 export function AuthShell({ children, application }: { children: React.ReactNode; application?: { name: string; domain: string; initial: string } }) {
   return <div className={styles.page}>
     <header className={styles.header}><a href="https://hubzero.in" aria-label="HubZero home"><Brand /></a><span>Account / Sign in</span></header>
-    <main id="main-content" className={styles.stage}>
+    <main id="main-content" tabIndex={-1} className={styles.stage}>
       <aside className={styles.introduction} aria-label="About HubZero Account">
         <p className={styles.eyebrow}>HubZero Account</p>
         <p className={styles.statement}>One account.<br/><em>Your HubZero.</em></p>

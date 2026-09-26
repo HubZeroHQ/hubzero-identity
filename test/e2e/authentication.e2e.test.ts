@@ -214,10 +214,30 @@ describe("HubZero Account browser lifecycle", () => {
         if (process.env.PHASE8_VISUAL_DIR) await page.screenshot({ path: resolve(process.env.PHASE8_VISUAL_DIR, `${route.slice(1) || "account"}-${width}.png`), fullPage: true });
       }
     }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const route of ["/", "/profile", "/security", "/sessions", "/applications"]) {
+      await page.goto(`${baseUrl}${route}`);
+      await expect(page.locator("#main-content")).toBeVisible();
+      await page.evaluate(async () => { await document.fonts.ready; document.documentElement.style.zoom = "2"; });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await expect(page.locator("h1")).toBeVisible();
+    }
     await page.goto(`${baseUrl}/profile`);
+    await expect(page.locator("#main-content")).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
     await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
+    for (const height of [600, 500, 450]) {
+      await page.setViewportSize({ width: 1280, height });
+      await page.goto(`${baseUrl}/applications`);
+      const signOut = page.getByRole("button", { name: "Sign out", exact: true });
+      await expect(signOut).toBeInViewport({ ratio: 1 });
+    }
+    await page.setViewportSize({ width: 1280, height: 320 });
+    const signOut = page.getByRole("button", { name: "Sign out", exact: true });
+    await signOut.scrollIntoViewIfNeeded();
+    await expect(signOut).toBeInViewport({ ratio: 1 });
     await context.close();
   });
 });

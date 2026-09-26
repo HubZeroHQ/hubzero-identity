@@ -33,7 +33,7 @@ export function AccountShell({ current, user, needsRotation = false, children }:
         </div>
         <form className={styles.signOut} action={signOutAction}><button type="submit">Sign out</button></form>
       </aside>
-      <main id="main-content" className={styles.content}>
+      <main id="main-content" tabIndex={-1} className={styles.content}>
         {children}
       </main>
     </div>
