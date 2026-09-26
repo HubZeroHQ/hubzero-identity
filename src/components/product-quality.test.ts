@@ -20,4 +20,10 @@ describe("production product surfaces", () => {
     expect(staleInteractionHtml).not.toMatch(/<script|sessionId|interactionUid|token=/);
     expect(staleInteractionHtml.match(/<h1>/g)).toHaveLength(1);
   });
+  it("describes Studio as a product instead of exposing client-registration copy", () => {
+    const applications = readFileSync("src/app/applications/page.tsx", "utf8");
+    expect(applications).toContain('application?.slug === "studio"');
+    expect(applications).toContain("Your workspace for publishing and managing HubZero content.");
+    expect(applications).toContain("<p>{description}</p>");
+  });
 });
