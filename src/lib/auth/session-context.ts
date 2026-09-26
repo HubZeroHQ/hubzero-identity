@@ -6,6 +6,7 @@ import type { Route } from "next";
 import type { IdentityUser } from "@/domain/identity";
 import { identityCredentialsCollection } from "@/lib/db/collections";
 import { getIdentityDatabaseConnection } from "@/lib/db/mongodb";
+import { parseEnvironment } from "@/lib/env";
 import { sessionCookieName } from "./cookies";
 import { getIdentityRuntime } from "./runtime";
 import { safeReturnPath } from "./origin";
@@ -19,9 +20,11 @@ export interface CurrentIdentity {
 }
 
 export async function getCurrentIdentity(): Promise<CurrentIdentity | null> {
-  const runtime = await getIdentityRuntime();
   const cookieStore = await cookies();
-  const token = cookieStore.get(sessionCookieName(runtime.environment))?.value;
+  const token = cookieStore.get(sessionCookieName(parseEnvironment(process.env)))?.value;
+  // An anonymous page needs no Mongo connection, credential service or session lookup.
+  if (!token) return null;
+  const runtime = await getIdentityRuntime();
   return resolveIdentitySessionToken(runtime, token);
 }
 

@@ -119,7 +119,8 @@ describe("HubZero Identity OIDC provider and first-party SSO", () => {
       await tab.getByRole("button", { name: "Continue with HubZero" }).click();
       const rejected = await response;
       vitestExpect(rejected.status()).toBe(400);
-      vitestExpect(await rejected.text()).toBe("That sign-in request is no longer valid. Return to Studio and start again.");
+      vitestExpect(await rejected.text()).toContain("That sign-in request is no longer valid. Return to Studio and start again.");
+      await expect(tab.getByRole("link", { name: "Return to Studio" })).toBeVisible();
       vitestExpect(await oidcStateCounts(database)).toEqual(completed);
     };
 

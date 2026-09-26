@@ -9,6 +9,8 @@ import { sessionCookieName } from "@/lib/auth/cookies";
 import { identityApplicationsCollection, identityCredentialsCollection, identityMembershipsCollection } from "@/lib/db/collections";
 import type { ApplicationDocument } from "@/lib/db/documents";
 import { oidcNodeErrorResponse, staleInteractionMessage } from "@/lib/oidc/error-response";
+import { timed, withRequestTiming } from "@/lib/observability/timing";
+import { staleInteractionHtml } from "@/lib/oidc/error-page";
 
 /**
  * Handles only the Node-native OIDC and health surface. It is deliberately
@@ -25,6 +27,18 @@ export interface IdentityNodeRequestOptions {
 }
 
 export async function handleIdentityNodeRequest(request: IncomingMessage, response: ServerResponse, environment: Environment, options: IdentityNodeRequestOptions = {}): Promise<boolean> {
+  const path = (request.url ?? "/").split("?")[0];
+  if (!isIdentityNodeRoute(path)) return handleNodeRequest(request, response, environment, options);
+  const route = path.startsWith("/interaction/") ? "interaction" : path === "/authorize" ? "authorize" : "protocol";
+  const start = performance.now();
+  return withRequestTiming(() => handleNodeRequest(request, response, environment, options), (timing) => {
+    if (environment.APP_ENV === "production" && (route === "interaction" || route === "authorize")) {
+      console.info("identity_auth_timing", { route, status: response.statusCode, durationMs: Math.round(performance.now() - start), ...timing });
+    }
+  });
+}
+
+async function handleNodeRequest(request: IncomingMessage, response: ServerResponse, environment: Environment, options: IdentityNodeRequestOptions): Promise<boolean> {
   try {
     if (environment.APP_ENV === "production" && request.headers.host !== new URL(environment.IDENTITY_ISSUER_URL).host) {
       send(response, 421, "Misdirected request");
@@ -41,7 +55,7 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
       send(response, 204, "");
       return true;
     }
-    const oidc = environment.OIDC_PROVIDER_ENABLED ? await getOidcProvider() : null;
+    const oidc = environment.OIDC_PROVIDER_ENABLED ? await timed("provider", getOidcProvider) : null;
     if (url.pathname === "/health/oidc" || url.pathname === "/health/ready") {
       // Metadata routes do not need password modules, but readiness must prove
       // that a normal credential-authentication request can resolve them.
@@ -63,7 +77,7 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
       decodeRequiredBase64Key(environment.SESSION_HMAC_KEY_BASE64!, "SESSION_HMAC_KEY_BASE64"),
     );
     if (url.pathname.startsWith("/interaction/") && request.method === "GET") {
-      await beginInteraction(request, response, oidc, continuationService, url.pathname.slice("/interaction/".length));
+      await timed("interaction", () => beginInteraction(request, response, oidc, continuationService, url.pathname.slice("/interaction/".length)));
       return true;
     }
     if (url.pathname.startsWith("/interaction/") && url.pathname.endsWith("/continue") && request.method === "POST") {
@@ -75,8 +89,8 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
         send(response, 400, "Invalid authorization request");
         return true;
       }
-      await prepareProviderRequest(request, oidc, url);
-      await oidc.provider.callback()(request, response);
+      await timed("prepare", () => prepareProviderRequest(request, oidc, url));
+      await timed("protocol", async () => { await oidc.provider.callback()(request, response); });
       return true;
     }
     return false;
@@ -87,7 +101,7 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
     // authorization codes, client assertions, or other protocol secrets.
     const failure = oidcNodeErrorResponse(error);
     console.error("oidc_request_failed", { classification: failure.classification, status: failure.status });
-    if (!response.headersSent) send(response, failure.status, failure.message);
+    if (!response.headersSent) send(response, failure.status, failure.message, request);
     return true;
   }
 }
@@ -138,14 +152,14 @@ async function beginInteraction(request: IncomingMessage, response: ServerRespon
   const secure = oidc.runtime.environment.APP_ENV !== "development" && oidc.runtime.environment.APP_ENV !== "test";
   response.setHeader("Set-Cookie", `${oidcContinuationCookieName(oidc.runtime.environment.APP_ENV)}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure ? "; Secure" : ""}`);
   response.statusCode = 303;
-  response.setHeader("Location", reauthenticationRequired ? "/sign-in?returnTo=%2Fauthorize%2Finteraction&reauth=1" : "/authorize/interaction");
+  response.setHeader("Location", reauthenticationRequired ? "/sign-in?returnTo=%2Fauthorize%2Finteraction&reauth=1" : !identity ? "/sign-in?returnTo=%2Fauthorize%2Finteraction" : "/authorize/interaction");
   response.end();
 }
 
 async function finishInteraction(request: IncomingMessage, response: ServerResponse, oidc: OidcProviderRuntime, continuations: OidcInteractionContinuationService, uid: string) {
   if (request.headers.origin && request.headers.origin !== "null" && request.headers.origin !== new URL(oidc.runtime.environment.IDENTITY_ISSUER_URL).origin) return send(response, 403, "Invalid request origin");
   const continuation = await continuations.find(parseCookie(request.headers.cookie, oidcContinuationCookieName(oidc.runtime.environment.APP_ENV)), uid);
-  if (!continuation) return send(response, 400, staleInteractionMessage);
+  if (!continuation) return send(response, 400, staleInteractionMessage, request);
   const identity = await resolveIdentitySessionToken(oidc.runtime, parseCookie(request.headers.cookie, sessionCookieName(oidc.runtime.environment)));
   if (!identity) return redirect(response, "/sign-in?returnTo=%2Fauthorize%2Finteraction");
   const credential = await identityCredentialsCollection(oidc.runtime.database).findOne({ identitySubject: identity.user.subject, type: "password" }, { projection: { mustChangePassword: 1 } });
@@ -179,8 +193,15 @@ function removeCookie(header: string | undefined, name: string): string {
   return (header ?? "").split(";").filter((item) => !item.trim().startsWith(`${name}=`) && !item.trim().startsWith(`${name}.sig=`)).join(";");
 }
 
-function send(response: ServerResponse, status: number, message: string) {
+function send(response: ServerResponse, status: number, message: string, request?: IncomingMessage) {
   response.statusCode = status;
+  if (status === 400 && message === staleInteractionMessage && request?.headers.accept?.includes("text/html")) {
+    applyProviderSecurityHeaders(response);
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.setHeader("Cache-Control", "no-store");
+    response.end(staleInteractionHtml);
+    return;
+  }
   response.setHeader("Content-Type", "text/plain; charset=utf-8");
   response.end(message);
 }
