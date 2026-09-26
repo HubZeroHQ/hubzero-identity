@@ -1,7 +1,8 @@
 # Phase 8 — Identity product quality
 
-Status: deployed; final interactive production smoke awaits operator sign-in.
-Phase 7 remains accepted. Phase 8 is not yet declared complete.
+Status: **COMPLETE — Identity product polish accepted**, 26 September 2026.
+Phase 7 remains accepted. Final authenticated production smoke and the additional
+short-desktop sidebar correction are verified. No authentication redesign.
 
 ## Boundaries
 
@@ -66,7 +67,7 @@ iad1 warm elapsed samples were 2466, 2582 and 2120 ms; bom1 samples were
 in bom1; Studio's region was not changed. This supports database distance as a
 material bottleneck, not a claim that every millisecond was Mongo execution.
 
-Final deployed measurement: first observed 3595 ms, then 797 and 842 ms warm.
+Initial timing-enabled deployed measurement: first observed 3595 ms, then 797 and 842 ms warm.
 Warm mean improved from 2670.5 to 819.5 ms, approximately **69%**. Samples are
 small and are not a latency SLA. No forced cold-start experiment was performed.
 Anonymous final authorization used two Mongo operations totaling 7 ms; interaction
@@ -83,6 +84,12 @@ Bounded `Server-Timing` metrics and structured timing logs use fixed phase names
 durations and operation counts, never request parameters or database documents.
 First-request latency and shared-tier variability remain non-blocking monitoring
 items; warm performance has materially improved without keep-warm traffic.
+
+The final accessibility deployment was reprofiled: 1096 ms first observed in
+that sample, then **714 and 679 ms** warm (mean 696.5 ms, approximately **74%**
+below the original warm mean). Warm TTFBs were Studio start 292/273 ms,
+authorize 52/55 ms, interaction 80/50 ms and sign-in 96/60 ms. This final sample
+was after authenticated-page checks and is not evidence of a forced cold start.
 
 ## Verification
 
@@ -112,8 +119,18 @@ Axe WCAG 2 A/AA and 2.1 AA found zero violations on all six Identity surfaces at
 390 and 1440. Single H1, semantic navigation, no horizontal overflow, keyboard
 skip link and reduced-motion contexts pass. Studio production checks at
 320/390/640/1024/1440 pass; axe at 390/1440 reports zero violations. The 640 CSS
-viewport checks 1280-at-200% equivalent reflow; native zoom verification remains
-to be completed during the authenticated production review.
+viewport checks 1280-at-200% equivalent reflow. Additional 200% CSS rendered-zoom
+checks pass for all five account routes, including a corrected Profile grid.
+Native browser-window zoom automation was unavailable (native pipe absent), so
+these are explicit rendered-zoom/reflow checks, not a claim of native OS testing.
+Keyboard skip-link activation now focuses the content landmark and is asserted.
+
+The operator reported clipped sidebar Sign out on short desktop screens. This
+was reproduced at 1280×500 (button bottom 531, outside viewport). The sticky
+rail now compacts its spacing at short heights and scrolls when necessary.
+Final production button bottoms: 580 at height 600, 480 at height 500, 443 at
+height 450; at height 320 it is fully reachable by rail scrolling (bottom 300).
+Real-browser regression assertions cover all four heights.
 
 Production invalid-interaction GET was tested without a real account: HTTP 400,
 static safe recovery page, no internal identifiers, no horizontal overflow and
@@ -122,7 +139,7 @@ preview/demo labels; source audit finds those strings only in regression tests.
 
 ## Deployment and bounded production checks
 
-- Identity UI/performance final-copy deployment: `dpl_6nxoAj2GQ6KpBGwBCRrxiA52CqLD`
+- Final Identity deployment: `dpl_7xCiT5dn3yjaQ7YRQUmaoGyvVrUa`
   READY and aliased to `https://auth.hubzero.in`; remote build and post-deploy
   live/ready/discovery/JWKS checks PASS.
 - Measured Identity runtime: `dpl_6DWSKEM4kMzsiNc7tFhi3oeDS1PT`, READY, bom1.
@@ -140,14 +157,61 @@ preview/demo labels; source audit finds those strings only in regression tests.
 - Tracked/current-secret scan: no real findings in either repository. Studio's
   existing fake cache-scope URI fixture was independently reviewed and excluded.
 
-## Remaining acceptance check
+## Authenticated production acceptance
 
 A brand-new temporary browser context started with zero cookies, opened the
 OIDC-only Studio login (zero password inputs) and reached canonical Identity
-sign-in. The operator must enter credentials directly; no password is requested
-in text, captured, logged or persisted. Fresh Studio session/current-user proof,
-authenticated production-page review and final acceptance await that interaction.
-Do not mark Phase 8 complete based solely on HTTP health or the automated suite.
+sign-in. The operator entered credentials directly; no password was read,
+requested in text, captured, logged or persisted. The browser reached Account
+with an Identity session and no Studio session. A new explicit Studio action
+then reused Identity SSO and completed authorize → interaction → callback →
+finalize → dashboard. A NEW Auth.js session was present; `/api/auth/session`
+resolved the exact original Studio ObjectId, headAdmin role and current authVersion.
+
+Protected Profile, user administration, Work and Team routes passed. A Work
+record's stored BSON creator reference matched the original Studio ObjectId and
+its protected detail page was accessible. No product data was edited. Current
+Studio user/mapping/role/disabled/authVersion snapshots remain identical.
+
+Account, Profile, Security, Sessions and Applications were checked with the real
+production session at 390/640/1440: one H1, no horizontal overflow or preview
+copy, zero axe violations at 390/1440. The final sidebar and zoom fixes were
+visually rechecked on production with identifying screenshot regions masked.
+
+Session regressions:
+- Identity-only cookies cannot authenticate Studio; Studio-only cookies redirect
+  to Identity sign-in. The test waits for streamed navigation to complete.
+- Identity cookie is host-only `__Host-hz_session`, Secure/HttpOnly/Lax/Path=/.
+  Studio owns a separate Secure/HttpOnly/Lax Auth.js encrypted product cookie.
+  No access/ID token is used as that browser session; exchange stays server-side.
+- Studio logout removes only its product session. Account still recognizes the
+  user; a subsequent Studio action reuses SSO without another password prompt.
+- Identity logout removes its current session. The existing Studio session and
+  protected profile remain valid; a future OIDC start requires Identity sign-in.
+- Only newly created smoke-test sessions were signed out. No other user's
+  sessions or authVersion were invalidated.
+
+Post-login bounded logs also passed: 100 Identity HTTP 200 records and 35 Studio
+records (34 HTTP 200, one HTTP 307), no detected secret leakage. Final health,
+canonical issuer and safe stale-request HTTP 400 were independently rechecked.
+The final 30-minute production 5xx query returned zero records for both projects.
+Temporary smoke-test sessions and browsers were signed out/closed; read-only DB
+connections were closed. Existing operator sessions outside the test context were
+not touched. Both `.env.local` files remain ignored.
+
+## Final refinements and regression coverage
+
+`c527f0c` fixes content-width-aware Profile reflow, programmatic skip-link focus,
+and the user-reported short-height sidebar. The first focus assertion ran before
+streamed content was visible; its wait was corrected rather than changing auth.
+Final lint/typecheck, 55 unit tests, 11 browser/OIDC tests and production build
+PASS; prior 25 Mongo integration tests remain applicable (no later DB changes).
+Portable build and secret scan PASS. Studio source remained unchanged during
+this final refinement; its 807-test/build baseline remains valid.
+
+The frontend-design and redesign-existing-projects guidance informed the canonical
+brand reuse, editorial hierarchy and observed-layout iteration. No template auth
+provider theme or fabricated account information was introduced.
 
 ## Rollback and retained material
 
