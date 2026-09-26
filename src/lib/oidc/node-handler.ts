@@ -9,7 +9,7 @@ import { sessionCookieName } from "@/lib/auth/cookies";
 import { identityApplicationsCollection, identityCredentialsCollection, identityMembershipsCollection } from "@/lib/db/collections";
 import type { ApplicationDocument } from "@/lib/db/documents";
 import { oidcNodeErrorResponse, staleInteractionMessage } from "@/lib/oidc/error-response";
-import { timed, withRequestTiming } from "@/lib/observability/timing";
+import { timed, withRequestTiming, safeServerTiming } from "@/lib/observability/timing";
 import { staleInteractionHtml } from "@/lib/oidc/error-page";
 
 /**
@@ -31,6 +31,13 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
   if (!isIdentityNodeRoute(path)) return handleNodeRequest(request, response, environment, options);
   const route = path.startsWith("/interaction/") ? "interaction" : path === "/authorize" ? "authorize" : "protocol";
   const start = performance.now();
+  if (route === "interaction" || route === "authorize") {
+    const writeHead = response.writeHead.bind(response);
+    response.writeHead = ((...args: Parameters<typeof writeHead>) => {
+      if (!response.headersSent) response.setHeader("Server-Timing", safeServerTiming());
+      return writeHead(...args);
+    }) as typeof response.writeHead;
+  }
   return withRequestTiming(() => handleNodeRequest(request, response, environment, options), (timing) => {
     if (environment.APP_ENV === "production" && (route === "interaction" || route === "authorize")) {
       console.info("identity_auth_timing", { route, status: response.statusCode, durationMs: Math.round(performance.now() - start), ...timing });

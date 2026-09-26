@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { mongoCommandTimer, timed, withRequestTiming } from "./timing";
+import { mongoCommandTimer, timed, withRequestTiming, safeServerTiming } from "./timing";
 
 describe("safe request timing", () => {
+  it("exports only numeric stage durations and a command count in response headers", async () => {
+    expect(safeServerTiming()).toBe("");
+    await withRequestTiming(async () => {
+      await timed("prepare", async () => { mongoCommandTimer()(); });
+      expect(safeServerTiming()).toMatch(/^prepare;dur=\d+, mongo;dur=\d+, mongo_ops;desc="1"$/);
+    }, () => {});
+  });
   it("isolates concurrent counters and reports only bounded metrics", async () => {
     const reports: unknown[] = [];
     await Promise.all([1, 2].map(count => withRequestTiming(async () => {

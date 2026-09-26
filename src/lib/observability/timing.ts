@@ -3,6 +3,12 @@ import { AsyncLocalStorage } from "node:async_hooks";
 interface RequestTiming { phases: Record<string, number>; mongoCount: number; mongoMs: number; }
 const current = new AsyncLocalStorage<RequestTiming>();
 
+export function safeServerTiming(): string {
+  const timing = current.getStore();
+  if (!timing) return "";
+  return [...Object.entries(timing.phases).map(([name, duration]) => `${name};dur=${duration}`), `mongo;dur=${timing.mongoMs}`, `mongo_ops;desc="${timing.mongoCount}"`].join(", ");
+}
+
 /** Bounded names and numbers only. Never accepts URLs, queries or database documents. */
 export function withRequestTiming<T>(run: () => Promise<T>, report: (timing: RequestTiming) => void): Promise<T> {
   const timing: RequestTiming = { phases: {}, mongoCount: 0, mongoMs: 0 };
