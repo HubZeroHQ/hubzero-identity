@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${instrumentSans.variable} ${instrumentSerif.variable} ${ibmPlexMono.variable}`}>
-      <body>{children}</body>
+      <body><a href="#main-content" className="skipLink">Skip to content</a>{children}</body>
     </html>
   );
 }

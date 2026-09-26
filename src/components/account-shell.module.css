@@ -1,21 +1,20 @@
-.frame { min-height: 100svh; padding: 16px; background: var(--bg-base); }
-.rail { position: fixed; z-index: 3; top: 16px; left: 50%; display: flex; min-height: 52px; width: max-content; max-width: calc(100% - 32px); align-items: center; gap: 4px; padding: 4px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface); box-shadow: 0 24px 60px -28px rgb(0 0 0 / .7); transform: translateX(-50%); }
-.brand { display: inline-flex; width: 44px; min-height: 44px; align-items: center; justify-content: center; }
-.nav { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.nav::-webkit-scrollbar { display: none; }
-.nav a { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; justify-content: center; padding: 0 14px; border-radius: var(--radius-pill); color: var(--ink-secondary); font-size: 14px; font-weight: 500; transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-press) linear; }
-.nav a:hover, .nav a.current { color: var(--ink); background: var(--surface-raised); }
-.nav a:active, .signOut button:active { transform: scale(.97); }
-.nav svg { display: none; }
-.person { display: flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; margin-left: 2px; padding-left: 2px; border-left: 1px solid var(--line); }
-.avatar { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--signal); font-family: var(--font-ibm-plex-mono), ui-monospace, monospace; font-size: 10px; }
-.person span:last-child { display: none; }
-.content { width: min(100%, 1300px); min-height: calc(100svh - 32px); margin: 0 auto; padding: clamp(132px, 15vw, 188px) clamp(20px, 8vw, 132px) 88px; }
-.previewDesktop { position: absolute; top: 102px; right: max(32px, calc((100vw - 1300px) / 2 + 56px)); color: var(--muted); font-family: var(--font-ibm-plex-mono), ui-monospace, monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
-.mobileHeader, .mobileNav { display: none; }
-.preview { color: var(--muted); font-family: var(--font-ibm-plex-mono), ui-monospace, monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
-.signOut { position: absolute; top: 24px; right: 28px; z-index: 4; }
-.signOut button { min-height: 36px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface); color: var(--muted); font-family: var(--font-ibm-plex-mono), ui-monospace, monospace; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-press) linear; }
-.signOut button:hover { background: var(--surface-raised); color: var(--ink); }
-@media (max-width: 760px) { .frame { padding: 12px; } .rail { top: 12px; left: 12px; right: 12px; width: auto; max-width: none; transform: none; } .brand { flex: 0 0 40px; width: 40px; } .nav { flex: 1 1 auto; } .nav a { min-height: 40px; padding: 0 12px; font-size: 13px; white-space: nowrap; } .person { min-height: 40px; } .content { min-height: calc(100svh - 24px); padding: 112px 8px 56px; } .previewDesktop { display: none; } .signOut { top: 78px; right: 20px; } }
-@media (max-width: 430px) { .nav a { padding: 0 10px; font-size: 12px; } }
+.frame { min-height: 100svh; max-width: 1360px; margin: auto; padding: 0 48px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 64px; }
+.rail { position: sticky; top: 0; height: 100svh; padding: 36px 24px 36px 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.brand { display: inline-flex; align-self: flex-start; margin-bottom: 56px; }
+.nav { display: grid; gap: 6px; }
+.nav a { display: flex; min-height: 48px; align-items: center; gap: 12px; padding: 0 12px; border-radius: 6px; color: var(--ink-secondary); font-size: 16px; transition: background 160ms, color 160ms; }
+.nav a:hover { background: var(--surface); color: var(--ink); }
+.nav a.current { background: var(--surface-raised); color: var(--ink); box-shadow: inset 2px 0 var(--signal); }
+.nav svg { flex-shrink: 0; color: var(--muted); }
+.nav .current svg { color: var(--signal); }
+.person { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 24px 0 16px; min-width: 0; }
+.avatar { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--ink-secondary); font-size: 13px; }
+.person > span:last-child { min-width: 0; }
+.person strong { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.person small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.signOut button { min-height: 44px; width: 100%; text-align: left; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: transparent; color: var(--ink-secondary); font-size: 14px; cursor: pointer; }
+.signOut button:hover { color: var(--ink); background: var(--surface-raised); }
+.content { min-width: 0; padding: 56px 0 80px; }
+@media (max-width: 1024px) { .frame { padding: 0 28px; gap: 32px; grid-template-columns: 200px minmax(0, 1fr); } .rail { padding-right: 20px; } }
+@media (max-width: 760px) { .frame { display: block; padding: 0 20px; } .rail { position: static; height: auto; padding: 24px 0 0; border: 0; display: grid; grid-template-columns: 1fr auto; gap: 24px 12px; } .brand { margin: 0; } .person { display: none; } .signOut { grid-column: 2; grid-row: 1; align-self: center; } .signOut button { width: auto; } .nav { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding-bottom: 20px; border-bottom: 1px solid var(--line); } .nav a { gap: 8px; padding: 0 8px; font-size: 14px; } .nav a.current { box-shadow: inset 0 -2px var(--signal); } .nav svg { width: 16px; } .content { padding: 32px 0 56px; } }
+@media (max-width: 360px) { .nav a { font-size: 13px; gap: 5px; } .nav svg { display: none; } }

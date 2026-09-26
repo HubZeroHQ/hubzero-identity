@@ -224,6 +224,7 @@ export class SessionService {
       current: session.id === currentSessionId,
       createdAt: session.createdAt,
       lastSeenAt: session.lastSeenAt,
+      expiresAt: new Date(Math.min(session.idleExpiresAt.getTime(), session.absoluteExpiresAt.getTime())),
       userAgentSummary: session.userAgentSummary,
     })));
   }

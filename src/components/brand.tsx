@@ -1,10 +1,11 @@
+import Image from "next/image";
 import styles from "./brand.module.css";
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className={styles.brand} aria-label="HubZero">
-      <span className={styles.mark} aria-hidden="true"><i /><i /><i /></span>
-      {!compact && <span className={styles.name}>HubZero</span>}
+      <Image src="/brand/hubzero-logo-black.svg" alt="" width={40} height={40} className={styles.mark} priority />
+      {!compact && <span className={styles.name}>HubZero <span>Account</span></span>}
     </div>
   );
 }

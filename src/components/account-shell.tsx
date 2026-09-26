@@ -19,7 +19,7 @@ export function AccountShell({ current, user, needsRotation = false, children }:
     <div className={styles.frame}>
       <SessionRefresh needed={needsRotation} />
       <aside className={styles.rail}>
-        <div className={styles.brand}><Brand /></div>
+        <Link href="/" className={styles.brand} aria-label="HubZero Account home"><Brand /></Link>
         <nav aria-label="Account navigation" className={styles.nav}>
           {navigation.map(({ href, label, icon: NavIcon }) => (
             <Link key={href} href={href} aria-current={current === label ? "page" : undefined} className={current === label ? styles.current : undefined}>
@@ -31,14 +31,9 @@ export function AccountShell({ current, user, needsRotation = false, children }:
           <span className={styles.avatar} aria-hidden="true">{initials}</span>
           <span><strong>{user.name}</strong><small>{user.email}</small></span>
         </div>
-      </aside>
-      <div className={styles.mobileHeader}><Brand /></div>
-      <nav className={styles.mobileNav} aria-label="Account navigation">
-        {navigation.map(({ href, label }) => <Link key={href} href={href} aria-current={current === label ? "page" : undefined}>{label}</Link>)}
-      </nav>
-      <main id="main-content" className={styles.content}>
-        <div className={styles.previewDesktop}>Design preview · no live account data</div>
         <form className={styles.signOut} action={signOutAction}><button type="submit">Sign out</button></form>
+      </aside>
+      <main id="main-content" className={styles.content}>
         {children}
       </main>
     </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AccountShell } from "@/components/account-shell";
 import { ArrowIcon, CheckIcon } from "@/components/icons";
 import { PageHeader, Status } from "@/components/ui";
+import { ProductMark } from "@/components/product-mark";
 import { getAccountData } from "@/lib/auth/account-data";
 import { requireFullAccountIdentity } from "@/lib/auth/session-context";
 import styles from "./account.module.css";
@@ -10,6 +11,7 @@ export default async function AccountOverview({ searchParams }: { searchParams: 
   const identity = await requireFullAccountIdentity("/");
   const [data, query] = await Promise.all([getAccountData(identity.user.subject, identity.sessionId), searchParams]);
   const initials = identity.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "HZ";
+  const activeApplications = data.memberships.filter(({ membership, application }) => membership.status === "active" && application?.enabled);
   return <AccountShell current="Account" user={identity.user} needsRotation={identity.needsRotation}>
     <PageHeader title="Your account" description="The identity you use across HubZero products." />
     {query.notice === "password-changed" ? <p className={styles.note} role="status">Your password was changed. Other sessions were signed out.</p> : null}
@@ -27,11 +29,11 @@ export default async function AccountOverview({ searchParams }: { searchParams: 
     </section>
     <section className={styles.section} aria-labelledby="connected-apps">
       <div className={styles.sectionHead}><h2 id="connected-apps">Applications</h2><Link href="/applications">View all</Link></div>
-      {data.memberships.length ? <div className={styles.appList}>{data.memberships.filter(({ membership }) => membership.status === "active").slice(0, 3).map(({ membership, application }) => <Link href="/applications" className={styles.app} key={membership.applicationId}><span className={styles.appMark}>{application?.brand.mark ?? application?.displayName.slice(0, 1) ?? "H"}</span><span><strong>{application?.displayName ?? "HubZero application"}</strong><small>{application?.visibility === "internal" ? "Internal" : "Private"} · Active membership</small></span><ArrowIcon size={16}/></Link>)}</div> : <p className={styles.empty}>Your account is not currently associated with a HubZero application.</p>}
+      {activeApplications.length ? <div className={styles.appList}>{activeApplications.slice(0, 3).map(({ membership, application }) => <Link href="/applications" className={styles.app} key={membership.applicationId}><ProductMark studio={application?.slug === "studio"} fallback={application?.displayName.slice(0, 1) ?? "H"} /><span><strong>{application?.displayName ?? "HubZero application"}</strong><small>Active membership</small></span><ArrowIcon size={16}/></Link>)}</div> : <p className={styles.empty}>No applications are currently available. Contact your HubZero administrator for access.</p>}
     </section>
     <section className={styles.section} aria-labelledby="security-check">
       <div className={styles.sectionHead}><h2 id="security-check">Security</h2><Link href="/security">Review security</Link></div>
-      <div className={styles.security}><span className={styles.securityIcon}><CheckIcon /></span><div><strong>Your password is current</strong><p>Review active sessions if you see a browser you do not recognize.</p></div></div>
+      <div className={styles.security}><span className={styles.securityIcon}><CheckIcon /></span><div><strong>{data.credential ? "Password sign-in is set up" : "Password details unavailable"}</strong><p>Your HubZero Account has {data.sessions.length} active {data.sessions.length === 1 ? "session" : "sessions"}. Review any browser you do not recognize.</p></div></div>
     </section>
   </AccountShell>;
 }

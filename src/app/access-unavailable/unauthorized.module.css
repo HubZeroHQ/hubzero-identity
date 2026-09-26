@@ -5,6 +5,7 @@
 .signedIn { padding: 16px 17px; display: grid; border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 24px; }
 .signedIn small { color: var(--muted); font-size: 11px; }
 .signedIn strong { font-size: 13px; margin-top: 2px; }
-.actions { display: flex; align-items: center; gap: 20px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+.actions a { display: inline-flex; min-height: 44px; align-items: center; color: var(--ink); text-decoration: underline; text-underline-offset: 5px; font-size: 15px; }
 .actions > button:last-child { border: 0; background: transparent; color: var(--signal); padding: 8px 0; font-size: 12px; font-weight: 650; cursor: pointer; }
 @media (max-width: 420px) { .actions { align-items: flex-start; flex-direction: column; gap: 8px; } }

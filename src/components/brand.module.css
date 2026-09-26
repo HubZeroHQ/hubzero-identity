@@ -1,7 +1,4 @@
-.brand { display: inline-flex; align-items: center; gap: 11px; color: var(--ink); font-weight: 620; letter-spacing: -0.025em; }
-.name { font-size: 18px; }
-.mark { position: relative; width: 21px; height: 21px; display: grid; grid-template-columns: repeat(3, 5px); gap: 3px; align-items: end; }
-.mark i { display: block; width: 5px; background: currentColor; border-radius: 1px; }
-.mark i:nth-child(1) { height: 12px; }
-.mark i:nth-child(2) { height: 20px; }
-.mark i:nth-child(3) { height: 8px; }
+.brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); }
+.mark { width: 40px; height: 40px; flex-shrink: 0; filter: invert(1); }
+.name { font-size: 18px; font-weight: 600; letter-spacing: -.025em; white-space: nowrap; }
+.name span { display: block; color: var(--muted); font-size: 13px; font-weight: 400; letter-spacing: .02em; }

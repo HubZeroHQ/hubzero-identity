@@ -6,7 +6,7 @@
   --surface-input: #171717;
   --ink: #ffffff;
   --ink-secondary: #cccccc;
-  --muted: #808080;
+  --muted: #a3a3a3;
   --faint: #999999;
   --line: #262626;
   --line-strong: #3a3a3a;
@@ -38,12 +38,14 @@ body {
   background: var(--bg-base);
   color: var(--ink);
   font-family: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.55;
   text-rendering: optimizeLegibility;
 }
 
 button, input { font: inherit; }
+.skipLink { position: fixed; left: 16px; top: -100px; z-index: 100; padding: 12px 20px; background: var(--ink); color: var(--bg-base); }
+.skipLink:focus { top: 16px; }
 a { color: inherit; text-decoration: none; }
 
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }

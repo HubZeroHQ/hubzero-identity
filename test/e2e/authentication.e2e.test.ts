@@ -3,6 +3,8 @@ import { once } from "node:events";
 import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
+import { mkdir } from "node:fs/promises";
+import AxeBuilder from "@axe-core/playwright";
 import { chromium, expect, type Browser, type Page } from "@playwright/test";
 import { ObjectId, type Db, type MongoClient } from "mongodb";
 import { afterAll, beforeAll, describe, it } from "vitest";
@@ -145,6 +147,7 @@ describe("HubZero Account browser lifecycle", () => {
     for (let index = 0; index < await cards.count(); index += 1) {
       if (!(await cards.nth(index).textContent())?.includes("This browser")) { await cards.nth(index).getByRole("button", { name: "Sign out" }).click(); break; }
     }
+    await firstPage.getByRole("button", { name: "Confirm sign out" }).click();
     await expect(firstPage).toHaveURL(/session-revoked/);
     await secondPage.goto(`${baseUrl}/`); await expect(secondPage).toHaveURL(/\/sign-in/);
     const third = await browser.newContext(); const thirdPage = await third.newPage();
@@ -159,6 +162,7 @@ describe("HubZero Account browser lifecycle", () => {
     const after = await first.cookies();
     expect(after.find((cookie) => cookie.name === "hz_session_dev")?.value).not.toBe(token);
     await firstPage.getByRole("button", { name: "Sign out other sessions" }).click();
+    await firstPage.getByRole("button", { name: "Confirm sign out" }).click();
     await expect(firstPage).toHaveURL(/other-sessions-signed-out/);
     await thirdPage.goto(`${baseUrl}/`); await expect(thirdPage).toHaveURL(/\/sign-in/);
     await first.close(); await second.close(); await third.close();
@@ -177,14 +181,44 @@ describe("HubZero Account browser lifecycle", () => {
   });
 
   it("keeps the sign-in surface usable without horizontal overflow at required widths", async () => {
-    for (const width of [1280, 768, 430, 390, 360, 320]) {
+    for (const width of [320, 360, 375, 390, 430, 768, 1024, 1280, 1440, 1920]) {
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage();
       await page.goto(`${baseUrl}/sign-in`);
       await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await expect(page.locator("h1")).toHaveCount(1);
+      if (width === 390 || width === 1440) expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
+      if (process.env.PHASE8_VISUAL_DIR) {
+        await mkdir(process.env.PHASE8_VISUAL_DIR, { recursive: true });
+        await page.screenshot({ path: resolve(process.env.PHASE8_VISUAL_DIR, `sign-in-${width}.png`), fullPage: true });
+      }
       await context.close();
     }
+  });
+  it("renders real account state across account routes and required viewports", async () => {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/sign-in`);
+    await signIn(page, regularEmail, changedPassword);
+    await expect(page).toHaveURL(`${baseUrl}/`);
+    for (const width of [320, 360, 375, 390, 430, 768, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const route of ["/", "/profile", "/security", "/sessions", "/applications"]) {
+        await page.goto(`${baseUrl}${route}`);
+        await expect(page.locator("h1")).toHaveCount(1);
+        await expect(page.getByRole("navigation", { name: "Account navigation" })).toHaveCount(1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        expect(await page.locator("body").innerText()).not.toMatch(/design preview|no live account data/i);
+        if (width === 390 || width === 1440) expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
+        if (process.env.PHASE8_VISUAL_DIR) await page.screenshot({ path: resolve(process.env.PHASE8_VISUAL_DIR, `${route.slice(1) || "account"}-${width}.png`), fullPage: true });
+      }
+    }
+    await page.goto(`${baseUrl}/profile`);
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await context.close();
   });
 });
 

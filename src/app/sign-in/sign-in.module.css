@@ -1,30 +1,26 @@
-.heading { margin-bottom: 36px; }
-.heading h1 { max-width: 8ch; margin: 0 0 16px; font-size: clamp(40px, 5vw, 64px); line-height: .99; letter-spacing: -.045em; font-weight: 600; text-wrap: balance; }
-.heading h1::first-letter { letter-spacing: -.06em; }
-.heading p { max-width: 40ch; margin: 0; color: var(--ink-secondary); font-size: 16px; line-height: 1.65; }
-.form { display: grid; gap: 20px; }
-.field { display: grid; gap: 8px; font-size: 13px; font-weight: 560; }
-.field input { width: 100%; height: 48px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 0 14px; color: var(--ink); background: var(--surface); }
-.field input:hover { border-color: var(--muted); }
-.field input:focus { border-color: var(--signal); outline: none; box-shadow: var(--focus); }
-.field input[readonly] { color: var(--muted); background: var(--surface-raised); }
-.passwordWrap { display: grid; gap: 8px; }
-.passwordWrap > span { font-size: 13px; font-weight: 560; }
+.heading { margin-bottom: 28px; }
+.heading h1 { margin: 0 0 12px; font-size: clamp(30px, 3vw, 38px); line-height: 1.1; letter-spacing: -.035em; font-weight: 600; }
+.heading p { margin: 0; color: var(--ink-secondary); font-size: 16px; }
+.form { display: grid; gap: 20px; max-width: 480px; }
+.field, .passwordWrap { display: grid; gap: 8px; font-size: 14px; font-weight: 500; }
+.field input, .inputWrap input { width: 100%; height: 50px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 14px; color: var(--ink); background: var(--bg-base); font-size: 16px; }
+.field input:hover, .inputWrap input:hover { border-color: var(--muted); }
+.field input:focus, .inputWrap input:focus { border-color: var(--signal); outline: 2px solid var(--signal); outline-offset: 2px; }
+.field input[readonly] { color: var(--muted); background: var(--surface); }
 .inputWrap { position: relative; }
-.inputWrap input { width: 100%; height: 48px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 0 70px 0 14px; color: var(--ink); background: var(--surface); }
-.inputWrap input:focus { border-color: var(--signal); outline: none; box-shadow: var(--focus); }
-.inputWrap button { position: absolute; top: 5px; right: 5px; height: 38px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-family: var(--font-ibm-plex-mono), ui-monospace, monospace; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.inputWrap input { padding-right: 76px; }
+.inputWrap button { position: absolute; top: 3px; right: 3px; min-width: 60px; min-height: 44px; border: 0; border-radius: 4px; background: transparent; color: var(--ink-secondary); font-size: 13px; cursor: pointer; }
 .inputWrap button:hover { color: var(--ink); background: var(--surface-raised); }
-.fullButton button { width: 100%; margin-top: 4px; }
-.forgot { color: var(--ink-secondary); font-size: 12px; font-weight: 560; width: max-content; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
-.notice { color: var(--muted); font-size: 11px; margin: 7px 0 0; line-height: 1.55; }
-.continue { width: 100%; min-height: 48px; margin-top: 4px; border: 0; border-radius: var(--radius-pill); background: var(--ink); color: var(--bg-base); font-size: 14px; font-weight: 600; cursor: pointer; transition: filter var(--duration-fast) var(--ease-standard), transform var(--duration-press) linear; }
-.continue:hover:not(:disabled) { filter: brightness(.86); }
-.continue:active:not(:disabled) { transform: scale(.98); }
-.continue:disabled { cursor: wait; opacity: 0.7; }
-.help { color: var(--muted); font-size: 11px; margin: 1px 0 0; line-height: 1.55; }
-.error, .success { margin: 0; padding: 12px 0; border-top: 1px solid; border-bottom: 1px solid; font-size: 12px; line-height: 1.5; }
-.error { color: var(--danger); background: transparent; border-color: rgb(242 145 122 / .5); }
-.success { color: var(--success); background: transparent; border-color: rgb(74 222 128 / .5); }
-.textAction { margin-top: 22px; padding: 8px 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+.fullButton button { width: 100%; }
+.notice, .help { color: var(--muted); font-size: 14px; margin: 0; line-height: 1.6; font-weight: 400; }
+.continue { width: 100%; min-height: 48px; margin-top: 4px; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--ink); color: var(--bg-base); font-size: 16px; font-weight: 600; cursor: pointer; transition: background 160ms, transform 110ms; }
+.continue:hover:not(:disabled) { background: #e6e6e6; }
+.continue:active:not(:disabled) { transform: translateY(1px); }
+.continue:disabled { cursor: wait; opacity: .7; }
+.error, .success { margin: 0; padding: 12px 16px; border-left: 2px solid; font-size: 14px; line-height: 1.5; }
+.error { color: var(--danger); background: var(--danger-soft); }
+.success { color: var(--success); background: var(--success-soft); }
+.textAction { min-height: 44px; padding: 8px 0; border: 0; color: var(--ink-secondary); background: transparent; font: inherit; font-size: 14px; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
 .textAction:hover { color: var(--ink); }
+.actions { display: flex; align-items: center; gap: 24px; }
+.actions .continue { width: auto; min-width: 160px; }
