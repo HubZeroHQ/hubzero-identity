@@ -1,16 +1,20 @@
 # Phase 7 controlled initialization and cutover runbook
 
-Status: controlled production import complete and one clean-browser headAdmin
-dual-mode OIDC canary accepted on 2026-09-25. On 2026-09-24 the approved
-five-account APPLY, reconciliation, and idempotent rerun passed against the
-verified post-infrastructure recovery point. **Studio remains in dual mode
-with legacy login available. No OIDC-only cutover or session invalidation
-occurred.**
+Status: **Phase 7 technical cutover COMPLETE on 2026-09-26.** The operator
+confirmed successful dual-mode Identity verification for all five users before
+authorizing final cutover. Studio is now OIDC-only: its login page shows only
+Continue with HubZero and its ordinary legacy Credentials path is disabled.
+All five Studio authVersion values were incremented once, from 0 to 1. A fresh
+post-cutover headAdmin session, stale-session rejection, logout independence,
+and immediate production observation passed. Longer operational observation
+continues; rollback material is retained. Historical checkpoints below describe
+the state at their respective execution times, not the current auth mode.
 
 Identity authenticates; Studio authorizes. The migration creates opaque `hz_`
 subjects and explicit Studio memberships, then adds each subject to the
-pre-existing Studio user. Studio ObjectIds, roles, `authVersion`, CMS references,
-and Team documents remain unchanged.
+pre-existing Studio user. Migration preserved Studio ObjectIds, roles,
+`authVersion`, CMS references, and Team documents. The separately approved final
+session cutover changed only authVersion and updatedAt on those five users.
 
 ## Executor contract
 
@@ -351,15 +355,13 @@ migration unchanged.
 
 ## Next stage gate
 
-The recovery, preflight, production PLAN, APPLY, reconciliation, no-op rerun,
-and one clean-browser headAdmin dual-mode canary are complete. **Do not rerun
-the import executor after users begin authenticating and credentials upgrade
-to Argon2id.** The remaining four production users have not been tested; each
-must be physically available to enter their own password before their
-separately approved verification. OIDC-only cutover, session invalidation,
-and the rollback window remain later gates. Preserve Studio bcrypt hashes and
-the additive Identity records as rollback material; do not remove them
-automatically.
+The recovery, production import, reconciliation, no-op rerun, dual-mode user
+verification, and final OIDC-only technical acceptance are complete. The final
+acceptance evidence is recorded below. **Do not rerun the import executor after
+users begin authenticating and credentials upgrade to Argon2id.** Preserve
+Studio bcrypt hashes, deployment references, recovery metadata, and additive
+Identity records through the post-cutover rollback window. No cleanup or
+destructive restore is implied by technical acceptance.
 
 ### First production dual-mode canary attempt (2026-09-25)
 
@@ -520,3 +522,179 @@ Returning to legacy mode may restore the old login UI if rollback is needed.
 During dual-mode verification, both login paths remain available.
 
 Fitness is outside this migration. No Fitness client or membership is created.
+
+### Final OIDC-only acceptance (2026-09-26)
+
+The operator explicitly confirmed that the headAdmin and all four ordinary
+admins had successfully authenticated through Identity and resolved to their
+existing Studio accounts in dual mode. This is operator-attested five-user
+evidence; this final execution directly exercised only the available headAdmin.
+The operator revised the final acceptance requirement to a fresh post-cutover
+headAdmin login plus structural checks for the other four users, rather than
+requiring all five to be physically present again.
+
+Read-only preflight independently verified scoped migration credentials for
+`hubzero` and `hubzero_identity`, five Studio users, five Identity users, five
+credentials, five active Studio memberships, five distinct mappings, and 15
+journal checkpoints. Roles remained one headAdmin/four admin, with no disabled
+or must-change-password state. All five Studio rollback credentials remained
+bcrypt cost 12. The Identity credential algorithms observed were four Argon2id
+and one bcrypt; no password reset or forced credential upgrade was performed.
+The production `studio` application remained enabled with client
+`hubzero-studio` and exact callback `https://hubzero.in/studio/oidc/callback`.
+
+Only the Studio Production auth-mode configuration changed:
+`STUDIO_AUTH_MODE=oidc`, with `STUDIO_OIDC_SHOW_LOGIN_ACTION=true` retained.
+Deployment `dpl_BM2PDZNaEEQve2VGAnDcsUsQPUF9` became READY at `hubzero.in`.
+Identity remained on `dpl_8Nh5Qos4BfWH5LQ616RzbR5TPV3H` with the canonical
+issuer `https://auth.hubzero.in`. No Identity deployment or protection setting
+changed in this execution.
+
+#### Login UX and provider enforcement
+
+A clean browser rendered `/studio/login` with exactly one Continue with
+HubZero link and zero email fields, password fields, or legacy submit buttons.
+The page did not auto-redirect. Mobile-width visual inspection confirmed the
+same explicit handoff. `/api/auth/signin` redirected to this login page.
+A direct legacy Credentials-provider POST, using an in-memory random dummy
+password and nonexistent synthetic identifier, returned Auth.js
+`CredentialsSignin` and established no session. The Auth.js transport response
+was HTTP 200 JSON; rejection was asserted from the error and absent session,
+not from HTTP status alone. Existing source and regression coverage confirm
+that OIDC-only rejects this path before user lookup or password verification.
+No real user's password was used for that negative probe.
+
+#### Controlled five-user session invalidation
+
+Before invalidation, a brand-new non-persistent Chromium context had zero
+cookies and a null Studio session. The operator entered credentials directly
+at Identity; no credential value or browser storage state was captured. A
+successful OIDC flow created a Studio session resolving the recorded original
+headAdmin ObjectId, current role, and authVersion 0. That same browser/session
+was retained deliberately for the invalidation test.
+
+A temporary guarded invocation of the existing Studio
+`userRepository.invalidateAllSessions()` mechanism verified exactly five
+enabled, correctly mapped users, expected roles, and authVersion 0 before
+calling the repository method. It used only the independently checked scoped
+migration client. The operation matched and modified exactly five documents:
+
+| Scope | Before | After |
+| --- | --- | --- |
+| All five existing Studio users | authVersion 0 | authVersion 1 |
+
+Full before/after user comparison excluding authVersion/updatedAt confirmed
+that no other user field changed. No Identity sessions were mass-invalidated.
+The retained version-0 Studio session then followed
+`/studio/profile` (307) -> `/studio/session-invalidated` (307) ->
+`/studio/login` (200). Its Auth.js cookie was removed and session endpoint
+returned null, without a redirect loop. Login remained OIDC-only.
+
+#### Fresh session and product-owned authorization
+
+Continue with HubZero reused the retained Identity SSO and created a new
+Studio session at authVersion 1. The server-resolved session matched the
+original headAdmin ObjectId and role. Profile, dashboard, headAdmin user
+management, and an existing owned blueprint detail were accessible. A
+subsequent required logout/SSO cycle was checked immediately against a newly
+consumed one-time Mongo handoff: both Identity subject and Studio ObjectId
+matched the unchanged migration mapping. An earlier delayed handoff query had
+outlived its 60-second TTL; it was not used as success evidence.
+
+Post-cutover read-only comparison retained all five ObjectIds, identitySubject
+bindings, roles, enabled states, legacy hash fingerprints, and all 15 journal
+checkpoints. All authVersion values were 1. CMS ownership/history reference
+fingerprints and Team document fingerprints were unchanged. No duplicate user,
+email-based fallback, mapping replacement, or content write occurred. Existing
+server-side current-user resolution remains authoritative for role, disabled
+state, and authVersion; Identity claims do not supply Studio authorization.
+
+#### Session and logout independence
+
+Identity owned `__Host-hz_session` on host-only `auth.hubzero.in`; Studio owned
+`__Secure-authjs.session-token` on host-only `hubzero.in`. Both were Secure,
+HttpOnly, Path=/, SameSite=Lax. Only cookie metadata was emitted. Separate
+temporary contexts containing only one application's cookies proved that
+Identity cookies did not authenticate Studio and Studio cookies did not
+authenticate Identity. Server-side token exchange and the one-time handoff
+continued to create Studio's own session; ID/access tokens were not persistent
+Studio browser sessions. Session secrets were not changed or shared.
+
+Studio logout removed its product session, while HubZero Account still
+recognized the Identity user. The next Studio login reused SSO without a
+password prompt and created a new product session. Identity-only logout then
+removed the Identity session while the existing Studio session still resolved
+the same headAdmin at authVersion 1 and accessed the protected profile. A new
+OIDC start required Identity sign-in again. No global logout is implemented or
+claimed. Temporary browser contexts were closed without persisting profiles.
+
+#### Verification and immediate observation
+
+| Verification performed in this final execution | Result |
+| --- | --- |
+| Studio lint / typecheck | PASS / PASS |
+| Studio full suite | 120 files, 804 tests PASS |
+| Focused auth/current-session/OIDC/index/invalidation regressions | 6 files, 14 tests PASS (subset of full suite) |
+| Studio local production build | PASS on unchanged-code retry after transient Mongo prerender timeout |
+| Studio Vercel production build | PASS |
+| Studio production dependency audit | 3 moderate, 0 high, 0 critical; nonzero audit exit, not a clean audit |
+| Identity source/build | Unchanged; unrelated expensive suites not repeated |
+| Identity production dependency audit | 0 findings |
+| Tracked-secret review | No real secrets detected; Studio URI-shaped matches were known synthetic test placeholders |
+| Browser acceptance | Fresh/stale session, OIDC-only UI/provider enforcement, protected access, both logout boundaries, cookie isolation PASS |
+
+The three previously tracked moderate dependency findings remain
+`next`/`postcss` and `sanitize-html`, as recorded in Phase 6B. They are not new
+cutover defects. The current content sanitizer allowlist excludes SVG/SMIL and
+style attributes; dependency maintenance remains separate from this auth
+cutover. No unrelated major framework upgrade was bundled here.
+
+Three active health samples at 13:19:25, 13:20:50, and 13:22:41 UTC on
+2026-09-26 returned Identity live 204, ready 200, and Studio login 200.
+Discovery/JWKS and canonical metadata also passed. The final recent
+300-record sample from each deployment contained zero 5xx and zero
+warning/error entries: Studio 276x200/24x307; Identity 222x200/42x204/36x303.
+Broader sampled logs and a separate sensitive-value review detected no known
+configured secrets, raw session-cookie assignments, authorization-code/token
+query values, credential hashes, Mongo URIs, or private signing material.
+This is bounded immediate observation, not a claim of exhaustive logs or a
+multi-day stability window. Longer operational observation continues.
+
+No genuine product defect or product source change was required in this final
+cutover. Temporary harness timing/TTL assumptions and the transient local build
+connection failure were corrected or retried without weakening auth semantics.
+Temporary scripts were removed; no browser artifacts or secrets were committed.
+
+#### Acceptance and rollback
+
+| Final Phase 7 gate | Result |
+| --- | --- |
+| Reconciled migration 5 users/credentials/memberships/mappings, 15 checkpoints | PASS |
+| All five dual-mode OIDC verifications (operator attestation) | PASS |
+| OIDC-only deployment and explicit HubZero-only login UX | PASS |
+| Ordinary local-credential provider disabled | PASS |
+| Five-user authVersion invalidation and clean stale-session handling | PASS |
+| Fresh post-cutover session with original ObjectId, subject, role, current version | PASS |
+| Protected Studio/CMS access, unchanged ownership/Team references, no duplicate | PASS |
+| Product-owned authorization and independent session/logout boundaries | PASS |
+| Immediate health/log observation; no unresolved cutover auth defect | PASS |
+| Rollback deployments, legacy hashes, journal and recovery metadata retained | PASS |
+
+**Phase 7: COMPLETE.** Studio authenticates exclusively through Identity in
+normal production UX. Credentials are entered only at `auth.hubzero.in`.
+Known-good dual deployment: `dpl_H83Z3vezivk39VmwLFetzXZijiTw`.
+Known-good legacy deployment: `dpl_5UM9JBri35EUSunStsL3vSXetPrw`.
+Emergency auth rollback remains a supported Vercel promotion of the appropriate
+known-good deployment, with Production flags restored to `dual`/true or
+`legacy`/false for subsequent deployments. Do not decrement authVersion to
+resurrect old sessions: users establish new sessions after rollback. Do not
+delete additive migration state or restore a database merely to change auth
+mode. Retained Studio hashes are migration-era rollback material and must not
+be assumed to match passwords changed later in Identity. Preserve the agreed
+account-change/rollback safeguards until the operator ends that window.
+
+No Atlas users, rollback credentials, migration journal, or backup artifacts
+were removed. Concurrent replay stress, exhaustive cross-instance persistence,
+live key rotation/rollback rehearsal, and exhaustive callback-negative browser
+testing remain the previously deferred operational work, not claims made here.
+No Fitness work or remote push was performed.
