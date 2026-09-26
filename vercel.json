@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["bom1"],
   "rewrites": [
     { "source": "/.well-known/openid-configuration", "destination": "/api/oidc/discovery" },
     { "source": "/authorize", "destination": "/api/oidc/authorize" },
