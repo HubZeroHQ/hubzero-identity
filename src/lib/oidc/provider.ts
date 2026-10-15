@@ -3,7 +3,7 @@ import type { JWK } from "jose";
 import { identityApplicationsCollection, identityUsersCollection } from "@/lib/db/collections";
 import { decodeRequiredBase64Key } from "@/lib/security/crypto";
 import { createIdentityRuntime, type IdentityRuntime } from "@/lib/auth/runtime";
-import { parseEnvironment, type Environment } from "@/lib/env";
+import { isProductionGrade, parseEnvironment, type Environment } from "@/lib/env";
 import { createMongoOidcAdapter } from "./mongo-adapter";
 
 export interface OidcProviderRuntime {
@@ -40,7 +40,7 @@ export async function createOidcProvider(environment: Environment): Promise<Oidc
     routes: { authorization: "/authorize", token: "/token", jwks: "/jwks" },
     ttl: { AuthorizationCode: 60, AccessToken: 300, IdToken: 300, Interaction: 10 * 60, Session: 60 * 60, Grant: 60 * 60 },
     cookies: {
-      names: environment.APP_ENV === "production"
+      names: isProductionGrade(environment.APP_ENV)
         // oidc-provider scopes the resume cookie to /authorize/:uid. It must
         // therefore not use the __Host- prefix, whose contract requires
         // Path=/; Chromium correctly rejects that combination.

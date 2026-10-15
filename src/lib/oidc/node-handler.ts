@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { WithId } from "mongodb";
-import type { Environment } from "@/lib/env";
+import { isProductionGrade, type Environment } from "@/lib/env";
 import { getOidcProvider, type OidcProviderRuntime } from "@/lib/oidc/provider";
 import { OidcInteractionContinuationService, oidcContinuationCookieName, parseCookie } from "@/lib/oidc/interaction-continuation";
 import { decodeRequiredBase64Key } from "@/lib/security/crypto";
@@ -47,7 +47,7 @@ export async function handleIdentityNodeRequest(request: IncomingMessage, respon
 
 async function handleNodeRequest(request: IncomingMessage, response: ServerResponse, environment: Environment, options: IdentityNodeRequestOptions): Promise<boolean> {
   try {
-    if (environment.APP_ENV === "production" && request.headers.host !== new URL(environment.IDENTITY_ISSUER_URL).host) {
+    if (isProductionGrade(environment.APP_ENV) && request.headers.host !== new URL(environment.IDENTITY_ISSUER_URL).host) {
       send(response, 421, "Misdirected request");
       return true;
     }

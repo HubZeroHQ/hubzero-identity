@@ -18,7 +18,8 @@ function contentSecurityPolicy(nonce: string, development: boolean): string {
 
 export function proxy(request: NextRequest) {
   const configuredOrigin = process.env.IDENTITY_ISSUER_URL;
-  if (process.env.APP_ENV === "production" && configuredOrigin) {
+  // Production and the isolated staging issuer both enforce their canonical host.
+  if ((process.env.APP_ENV === "production" || process.env.APP_ENV === "staging") && configuredOrigin) {
     const expectedHost = new URL(configuredOrigin).host;
     if (request.headers.get("host") !== expectedHost) return new NextResponse("Misdirected request", { status: 421 });
   }

@@ -69,8 +69,40 @@ for the present provider. Docker-only `PORT` is not a Vercel requirement.
 
 Preview deployments must set `APP_ENV=preview` and leave
 `OIDC_PROVIDER_ENABLED=false`; environment validation rejects enabled OIDC on a
-preview. A future isolated protocol test deployment needs its own explicit
-issuer, clients, secrets, and database, not an arbitrary preview hostname.
+preview. An isolated protocol test deployment uses `APP_ENV=staging` instead,
+with its own explicit issuer, clients, secrets, and database, never an arbitrary
+preview hostname.
+
+### Isolated OIDC test issuer (`APP_ENV=staging`)
+
+`staging` is production-grade everywhere `production` is: an HTTPS issuer;
+required `SESSION_HMAC_KEY_BASE64` and `RATE_LIMIT_HMAC_KEY_BASE64`; every HMAC
+key at least 32 bytes; `__Host-` cookie names; Secure cookies; and canonical
+`Host` enforcement in Proxy and the Node bridge. It differs in exactly two ways,
+both enforced by environment validation:
+
+- the issuer host must **not** be `auth.hubzero.in`;
+- the database must be exactly `hubzero_identity_staging`, so neither the
+  production Identity database (`hubzero_identity`) nor Studio's (`hubzero`)
+  can be selected.
+
+Every secret (signing keyset and active `kid`, HMAC keys, client secrets) is
+generated for staging alone; none is copied from production.
+
+The dedicated Studio test client is registered with
+`scripts/register-staging-studio-client.ts`. It reads only
+`IDENTITY_STAGING_MONGODB_URI`, refuses any database but
+`hubzero_identity_staging`, and refuses to write unless the credential holds
+exactly `readWrite@hubzero_identity_staging`. It also refuses:
+
+- the production issuer host;
+- the production client `hubzero-studio`;
+- the production secret reference `studio-production`;
+- a `hubzero.in` or `www.hubzero.in` callback;
+- any callback other than `https://<host>/studio/oidc/callback`.
+
+Creating the staging deployment, its DNS name, database, keys, and client is an
+operator action that needs separate authorization.
 
 ## Host, cookies, keys, and health
 

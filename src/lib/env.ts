@@ -1,11 +1,34 @@
 import { z } from "zod";
 
+export const PRODUCTION_IDENTITY_ISSUER = "https://auth.hubzero.in";
+/** The only database an `APP_ENV=staging` (isolated OIDC test) runtime may use. */
+export const STAGING_IDENTITY_DATABASE = "hubzero_identity_staging";
+
+export type AppEnvironment = "development" | "test" | "preview" | "staging" | "production";
+
+/**
+ * Production and staging get production-grade behaviour everywhere: HTTPS,
+ * required HMAC keys, `__Host-` cookies, Secure cookies and canonical-host
+ * enforcement. Staging differs only in its issuer and database.
+ */
+export function isProductionGrade(appEnvironment: string | undefined): boolean {
+  return appEnvironment === "production" || appEnvironment === "staging";
+}
+
+function sameIssuerHost(issuer: string, other: string): boolean {
+  try {
+    return new URL(issuer).hostname.toLowerCase() === new URL(other).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 const optionalSecret = z.string().min(1).optional();
 const booleanFlag = z.enum(["true", "false"]).optional().transform((value) => value === "true");
 
 export const environmentSchema = z
   .object({
-    APP_ENV: z.enum(["development", "test", "preview", "production"]),
+    APP_ENV: z.enum(["development", "test", "preview", "staging", "production"]),
     IDENTITY_ISSUER_URL: z.string().url(),
     MONGODB_URI: z.string().min(1),
     MONGODB_DATABASE: z.string().min(1).optional(),
@@ -50,15 +73,27 @@ export const environmentSchema = z
     if (environment.APP_ENV === "preview" && environment.OIDC_PROVIDER_ENABLED) {
       context.addIssue({ code: "custom", path: ["OIDC_PROVIDER_ENABLED"], message: "OIDC is disabled on previews; use an explicitly configured isolated test environment for protocol rehearsal" });
     }
-    if (environment.APP_ENV !== "production") return;
+    if (!isProductionGrade(environment.APP_ENV)) return;
+    // Staging is the isolated OIDC test environment: every production check
+    // applies, plus fail-closed rejection of the production issuer and of any
+    // database other than the dedicated staging database.
+    const label = environment.APP_ENV === "production" ? "Production" : "Staging";
     if (!environment.IDENTITY_ISSUER_URL.startsWith("https://")) {
-      context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must use HTTPS" });
+      context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: `${label} issuer must use HTTPS` });
     }
     for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64"] as const) {
-      if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required in production` });
+      if (!environment[name]) context.addIssue({ code: "custom", path: [name], message: `${name} is required in ${label.toLowerCase()}` });
     }
-    if (environment.IDENTITY_ISSUER_URL !== "https://auth.hubzero.in") {
-      context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: "Production issuer must be https://auth.hubzero.in" });
+    if (environment.APP_ENV === "production" && environment.IDENTITY_ISSUER_URL !== PRODUCTION_IDENTITY_ISSUER) {
+      context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: `Production issuer must be ${PRODUCTION_IDENTITY_ISSUER}` });
+    }
+    if (environment.APP_ENV === "staging") {
+      if (sameIssuerHost(environment.IDENTITY_ISSUER_URL, PRODUCTION_IDENTITY_ISSUER)) {
+        context.addIssue({ code: "custom", path: ["IDENTITY_ISSUER_URL"], message: `Staging must never use the production issuer host ${new URL(PRODUCTION_IDENTITY_ISSUER).host}` });
+      }
+      if (environment.MONGODB_DATABASE !== STAGING_IDENTITY_DATABASE) {
+        context.addIssue({ code: "custom", path: ["MONGODB_DATABASE"], message: `Staging must use exactly the ${STAGING_IDENTITY_DATABASE} database` });
+      }
     }
     for (const name of ["SESSION_HMAC_KEY_BASE64", "RATE_LIMIT_HMAC_KEY_BASE64", "OIDC_ADAPTER_HMAC_KEY_BASE64"] as const) {
       const value = environment[name];

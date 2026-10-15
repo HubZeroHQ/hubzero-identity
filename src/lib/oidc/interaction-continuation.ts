@@ -1,12 +1,13 @@
 import type { Db } from "mongodb";
 import { oidcInteractionContinuationsCollection } from "@/lib/db/collections";
+import { isProductionGrade, type AppEnvironment } from "@/lib/env";
 import { hmacSha256, randomBase64Url } from "@/lib/security/crypto";
 
-export const oidcContinuationCookieName = (environment: "production" | "development" | "test" | "preview") =>
-  environment === "production" ? "__Host-hz_oidc_continue" : "hz_oidc_continue_dev";
+export const oidcContinuationCookieName = (environment: AppEnvironment) =>
+  isProductionGrade(environment) ? "__Host-hz_oidc_continue" : "hz_oidc_continue_dev";
 
-export const oidcProviderSessionCookieName = (environment: "production" | "development" | "test" | "preview") =>
-  environment === "production" ? "__Host-hz_oidc" : "hz_oidc_dev";
+export const oidcProviderSessionCookieName = (environment: AppEnvironment) =>
+  isProductionGrade(environment) ? "__Host-hz_oidc" : "hz_oidc_dev";
 
 export class OidcInteractionContinuationService {
   constructor(private database: Db, private hmacKey: Uint8Array) {}
