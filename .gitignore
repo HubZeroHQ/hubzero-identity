@@ -15,14 +15,50 @@
 .env*
 !.env.example
 
+# private keys and credential stores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+.npmrc
+
+# database exports (mongodump writes *.bson and *.metadata.json)
+*.bson
+*.metadata.json
+*.archive
+*.archive.gz
+*.dump
+*.sql
+/dump/
+
+# backups and local archives
+*.bundle
+*.bak
+*.backup
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+/backups/
+/recovery/
+
 # test and tooling output
 /coverage
 /artifacts
+/test-results/
+/playwright-report/
 *.tsbuildinfo
 next-env.d.ts
 
-# logs and OS/editor files
+# logs, temporary and OS/editor files
 *.log
+*.tmp
+/tmp/
 .DS_Store
 Thumbs.db
 .idea/
