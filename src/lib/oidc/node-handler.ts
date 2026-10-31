@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { WithId } from "mongodb";
 import type { Environment } from "@/lib/env";
 import { getOidcProvider, type OidcProviderRuntime } from "@/lib/oidc/provider";
+import { isIdentityNodeRoute, isProviderRoute } from "@/lib/oidc/routes";
 import { OidcInteractionContinuationService, oidcContinuationCookieName, parseCookie } from "@/lib/oidc/interaction-continuation";
 import { decodeRequiredBase64Key } from "@/lib/security/crypto";
 import { resolveIdentitySessionToken } from "@/lib/auth/session-resolution";
@@ -111,14 +112,6 @@ async function handleNodeRequest(request: IncomingMessage, response: ServerRespo
     if (!response.headersSent) send(response, failure.status, failure.message, request);
     return true;
   }
-}
-
-export function isIdentityNodeRoute(pathname: string): boolean {
-  return pathname === "/health/live" || pathname === "/health/ready" || pathname === "/health/oidc" || pathname.startsWith("/interaction/") || isProviderRoute(pathname);
-}
-
-function isProviderRoute(pathname: string): boolean {
-  return pathname === "/authorize" || (pathname.startsWith("/authorize/") && pathname !== "/authorize/interaction") || pathname === "/token" || pathname === "/jwks" || pathname.startsWith("/.well-known/") || pathname.startsWith("/resume/");
 }
 
 async function prepareProviderRequest(request: IncomingMessage, oidc: OidcProviderRuntime, url: URL) {

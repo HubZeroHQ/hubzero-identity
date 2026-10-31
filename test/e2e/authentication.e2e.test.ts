@@ -102,6 +102,40 @@ describe("HubZero Account browser lifecycle", () => {
     await context.close();
   });
 
+  it("applies a per-request CSP that hydrates every page without violations", async () => {
+    const first = await fetch(`${baseUrl}/sign-in`); const second = await fetch(`${baseUrl}/sign-in`);
+    const policies = [first, second].map((response) => response.headers.get("content-security-policy") ?? "");
+    const nonces = policies.map((policy) => /'nonce-([^']+)'/.exec(policy)?.[1]);
+    expect(nonces[0]).toBeTruthy(); expect(nonces[0]).not.toBe(nonces[1]);
+    expect(policies[0]).not.toMatch(/unsafe-(inline|eval)/);
+    expect(await first.text()).toContain(`nonce="${nonces[0]}"`);
+
+    const context = await browser.newContext(); const page = await context.newPage();
+    const problems: string[] = [];
+    page.on("console", (message) => { if (message.type() === "error" || /content security policy/i.test(message.text())) problems.push(message.text()); });
+    page.on("pageerror", (error) => problems.push(error.message));
+    await page.addInitScript(() => { document.addEventListener("securitypolicyviolation", (event) => console.error(`CSP violation ${event.violatedDirective} ${event.blockedURI}`)); });
+    await page.goto(`${baseUrl}/sign-in`);
+    await signIn(page, regularEmail, originalPassword);
+    await expect(page).toHaveURL(`${baseUrl}/`);
+    for (const route of ["/", "/profile", "/security", "/sessions", "/applications"]) {
+      await page.goto(`${baseUrl}${route}`);
+      await expect(page.locator("#main-content")).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute("lang", "en");
+      await page.waitForLoadState("networkidle");
+    }
+    // A client-side navigation can only happen once the page has hydrated.
+    await page.goto(`${baseUrl}/`);
+    await page.getByRole("navigation", { name: "Account navigation" }).getByRole("link", { name: "Security" }).click();
+    await expect(page).toHaveURL(`${baseUrl}/security`);
+    const response = await page.goto(`${baseUrl}/this-page-does-not-exist`);
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+    expect(await page.locator("main").evaluate((element) => getComputedStyle(element).display)).toBe("grid");
+    expect(problems.filter((message) => !/404/.test(message))).toEqual([]);
+    await context.close();
+  });
+
   it("rate limits repeated unknown-account attempts without changing the public credential error", async () => {
     const context = await browser.newContext(); const page = await context.newPage();
     await page.goto(`${baseUrl}/sign-in`);

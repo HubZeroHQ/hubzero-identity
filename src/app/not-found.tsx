@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand";
+import styles from "@/app/status.module.css";
 
 export default function NotFound() {
-  return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><div style={{ maxWidth: 420 }}><Brand /><h1 style={{ marginTop: 60, fontSize: 32, letterSpacing: "-.04em" }}>Page not found</h1><p style={{ color: "var(--muted)" }}>This page isn’t part of HubZero Account.</p><Link href="/" style={{ color: "var(--signal)", fontWeight: 650 }}>Return to your account</Link></div></main>;
+  return <main className={styles.page}><div className={styles.content}><Brand /><h1 className={styles.heading}>Page not found</h1><p className={styles.muted}>This page isn’t part of HubZero Account.</p><Link href="/" className={styles.link}>Return to your account</Link></div></main>;
 }

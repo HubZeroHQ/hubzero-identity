@@ -1,0 +1,33 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.content {
+  max-width: 420px;
+}
+
+.heading {
+  margin-top: 60px;
+  font-size: 32px;
+  letter-spacing: -.04em;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.link {
+  color: var(--signal);
+  font-weight: 650;
+}
+
+.loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
