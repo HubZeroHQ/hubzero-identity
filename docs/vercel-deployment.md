@@ -20,6 +20,10 @@ Browser → Vercel HTTPS edge → Next.js Account routes
 fixed Node Function adapters under `api/oidc/`. Each adapter reconstructs one
 canonical issuer path before calling the Node-native provider bridge. Fixed
 functions avoid relying on catch-all routing behavior for protocol artifacts.
+`/health/live` shares the `health/oidc` Function: the active Proxy is itself a
+Function, and the Hobby plan allows twelve per deployment. A further Function
+needs another merge or a plan change, and `vercel deploy --prebuilt` cannot be
+used on Hobby because its output counts every route separately.
 No discovery metadata or client registration exposes an `/api/oidc` URL or a
 second issuer. `/authorize/interaction` intentionally remains a Next route,
 not a rewrite target.
@@ -65,7 +69,12 @@ Configure these in Vercel's project environment settings, never in Git,
 
 `EMAIL_*` remains development/future recovery configuration and is not required
 for the present provider. Docker-only `PORT` is not a Vercel requirement.
-`VERCEL_URL` is never used to derive issuer, host trust, redirects, or cookies.
+`VERCEL_URL` is never used to derive issuer, redirects, or cookies. Its one use
+is the preview host check below.
+
+This project currently defines its variables for Production only, so a preview
+serves Proxy, static assets and `/health/live` but cannot render account pages
+or protocol routes. Those are verified by the isolated browser suites.
 
 Preview deployments must set `APP_ENV=preview` and leave
 `OIDC_PROVIDER_ENABLED=false`; environment validation rejects enabled OIDC on a
@@ -74,11 +83,22 @@ issuer, clients, secrets, and database, not an arbitrary preview hostname.
 
 ## Host, cookies, keys, and health
 
-In production both Proxy and the Node bridge require the configured canonical
-`Host`; unexpected hosts receive `421`. The issuer itself is fixed by
+`src/proxy.ts` sits beside `src/app`, because Next.js ignores a root Proxy when
+the application is under `src`. In production both Proxy and the Node bridge
+require the configured canonical `Host`; unexpected hosts receive `421`,
+including production deployment URLs. A preview accepts only its own
+`VERCEL_URL`. Development and test keep any host. The issuer itself is fixed by
 configuration, never `Host`, `X-Forwarded-Host`, or `VERCEL_URL`. The Identity
 cookie remains `__Host-hz_session`, HttpOnly, Secure, SameSite=Lax, Path `/`,
 and has no Domain attribute.
+
+Proxy applies a per-request nonce CSP to Next pages. The Node bridge sets its
+own policy on protocol responses, and Proxy only checks their host. Inline
+`style` attributes are blocked, so images render through `StrictImage`.
+`form-action 'self'` also covers a form's redirects: the Continue POST
+therefore ends in a same-origin page that moves on to `/resume/:uid`, rather
+than redirecting toward the relying party. Do not widen `form-action` for this
+flow, since a client navigation leaves the sign-in page's policy in force.
 
 `/health/live` checks only request handling. `/health/ready` and
 `/health/oidc` initialize/check enabled provider dependencies without revealing

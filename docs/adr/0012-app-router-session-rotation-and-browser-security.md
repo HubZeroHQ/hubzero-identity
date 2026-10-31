@@ -12,7 +12,7 @@ Use one server-side session resolver for all account routes. It validates the Ht
 
 Use Server Actions for normal account mutations. Every action independently checks the configured issuer origin before reading identity/session state. Return destinations are accepted only as same-origin relative paths.
 
-Use a nonce-bearing CSP in production through Next 16 `proxy.ts`, with `script-src` nonce plus `strict-dynamic`, nonce-bound styles, no framing, no objects, exact form actions, and no third-party sources. Account routes are intentionally dynamically rendered. Development uses the smaller Next-required CSP exception (`unsafe-eval` for the runtime and inline styles for development tooling); it is not present in production.
+Use a nonce-bearing CSP in production through Next 16 `src/proxy.ts`, with `script-src` nonce plus `strict-dynamic`, nonce-bound styles, no framing, no objects, exact form actions, and no third-party sources. Account routes are intentionally dynamically rendered. Development uses the smaller Next-required CSP exception (`unsafe-eval` for the runtime and inline styles for development tooling); it is not present in production.
 
 ## Alternatives considered
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentSecurityPolicy, contentSecurityPolicyHeader, isAcceptedHost } from "./request-policy";
+import { contentSecurityPolicy, isAcceptedHost } from "./request-policy";
 
 const production = { APP_ENV: "production", VERCEL_ENV: "production", IDENTITY_ISSUER_URL: "https://auth.hubzero.in", VERCEL_URL: "hubzero-identity-abc.vercel.app" };
 const preview = { APP_ENV: "preview", VERCEL_ENV: "preview", IDENTITY_ISSUER_URL: "https://auth.hubzero.in", VERCEL_URL: "hubzero-identity-abc-team.vercel.app" };
@@ -57,9 +57,8 @@ describe("content security policy", () => {
     expect(policy).toContain("'unsafe-eval'");
   });
 
-  it("reports on previews and enforces in production", () => {
-    expect(contentSecurityPolicyHeader(preview)).toBe("Content-Security-Policy-Report-Only");
-    expect(contentSecurityPolicy("abc", preview, false)).not.toContain("upgrade-insecure-requests");
-    expect(contentSecurityPolicyHeader(production)).toBe("Content-Security-Policy");
+  it("does not upgrade requests for a local application served over HTTP", () => {
+    expect(contentSecurityPolicy("abc", { APP_ENV: "test" }, false)).not.toContain("upgrade-insecure-requests");
+    expect(contentSecurityPolicy("abc", preview, false)).toContain("upgrade-insecure-requests");
   });
 });

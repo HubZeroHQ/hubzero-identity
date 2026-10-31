@@ -115,9 +115,9 @@ describe("Proxy host boundary", () => {
     for (const host of [canonicalHost, "hubzero-identity.vercel.app", "other-deployment.vercel.app"]) expect((await probe(previewPort, host, "/sign-in")).status).toBe(421);
   });
 
-  it("reports rather than enforces on a preview", async () => {
+  it("enforces the same policy on a preview", async () => {
     const response = await probe(previewPort, deploymentHost, "/sign-in");
-    expect(response.headers["content-security-policy-report-only"]).toContain("'nonce-");
-    expect(response.headers["content-security-policy"]).toBeUndefined();
+    expect(response.headers["content-security-policy"]).toContain("'nonce-");
+    expect(response.headers["content-security-policy-report-only"]).toBeUndefined();
   });
 });

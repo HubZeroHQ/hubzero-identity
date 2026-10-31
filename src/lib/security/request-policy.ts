@@ -1,8 +1,5 @@
 type RequestEnvironment = Record<string, string | undefined>;
 
-export const enforcedCspHeader = "Content-Security-Policy";
-export const reportOnlyCspHeader = "Content-Security-Policy-Report-Only";
-
 /** Local runs keep any host; every deployed environment names exactly one. */
 function isLocalEnvironment(environment: RequestEnvironment): boolean {
   if (environment.VERCEL_ENV) return environment.VERCEL_ENV === "development";
@@ -40,13 +37,8 @@ export function isAcceptedHost(host: string | null, environment: RequestEnvironm
   }
 }
 
-export function contentSecurityPolicyHeader(environment: RequestEnvironment): string {
-  return environment.VERCEL_ENV === "preview" ? reportOnlyCspHeader : enforcedCspHeader;
-}
-
 export function contentSecurityPolicy(nonce: string, environment: RequestEnvironment, development: boolean): string {
-  // Browsers ignore this directive in a report-only policy and log an error.
-  const upgrade = !development && !isLocalEnvironment(environment) && contentSecurityPolicyHeader(environment) === enforcedCspHeader;
+  const upgrade = !development && !isLocalEnvironment(environment);
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,

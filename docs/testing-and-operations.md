@@ -30,3 +30,13 @@ the required authorized-platform rehearsal.
 ## Operational checks
 
 Each release verifies install reproducibility, lint, types, tests, production build, secret scan, dependency audit, index plan, migration dry-run, backup/restore posture, and staging smoke tests. Authentication material is synthetic. No CI job receives production database access.
+
+## Vercel-native verification
+
+`npm run verify:vercel-native` checks `vercel build` output for `linux-x64` by
+default (`-- --target linux-arm64` selects the other Linux target). It reads the
+ELF header of every packaged native module, requires an Argon2 and a bcrypt
+binding for the target, and runs real hash and verify from the packaged
+function. It must run on the target platform, so use a Linux container on
+Windows or macOS. Non-Linux output fails, and that failure is the intended
+result: it could not load on Vercel.
