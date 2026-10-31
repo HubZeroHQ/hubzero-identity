@@ -82,7 +82,7 @@ describe("HubZero Identity OIDC provider and first-party SSO", () => {
     await page.goto(clientA.origin); await page.getByRole("link", { name: "Continue with HubZero" }).click();
     await expect(page).toHaveURL(/127\.0\.0\.1.*\/sign-in/); await signIn(page, "oidc-user@e2e.invalid", password);
     await expect(page).toHaveURL(/\/authorize\/interaction/); const completion = page.waitForResponse((response) => response.url().includes("/interaction/") && response.url().endsWith("/continue")); await page.getByRole("button", { name: "Continue with HubZero" }).click();
-    const completed = await completion; vitestExpect(completed.status()).toBe(303);
+    const completed = await completion; vitestExpect(completed.status()).toBe(200); vitestExpect(completed.headers()["cache-control"]).toBe("no-store");
     await expect(page).toHaveURL(clientA.origin); await expect(page.getByText(`Subject: ${subject}`)).toBeVisible();
     await page.goto(clientB.origin); await page.getByRole("link", { name: "Continue with HubZero" }).click();
     await expect(page).toHaveURL(clientB.origin); await expect(page.getByText(`Subject: ${subject}`)).toBeVisible();

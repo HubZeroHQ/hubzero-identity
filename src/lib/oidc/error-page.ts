@@ -1,2 +1,10 @@
 /** Static, no-JavaScript recovery surface. No request or provider values enter this HTML. */
 export const staleInteractionHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Start sign-in again · HubZero Account</title><link rel="stylesheet" href="/auth-error.css"></head><body><main><header><img src="/brand/hubzero-logo-black.svg" alt="" width="40" height="40"><span>HubZero Account</span></header><p class="label">Sign-in request expired</p><h1>Let’s start again.</h1><p>That sign-in request is no longer valid. Return to Studio and start again.</p><a href="https://hubzero.in/studio/login">Return to Studio →</a><p class="note">Your account and existing product sessions are unchanged.</p></main></body></html>`;
+
+const escapeAttribute = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+/** No-JavaScript step after the Continue form. `returnTo` is the provider's own resume URL. */
+export function interactionContinueHtml(returnTo: string): string {
+  const href = escapeAttribute(returnTo);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta http-equiv="refresh" content="0;url=${href}"><title>Continuing · HubZero Account</title><link rel="stylesheet" href="/auth-error.css"></head><body><main><header><img src="/brand/hubzero-logo-black.svg" alt="" width="40" height="40"><span>HubZero Account</span></header><h1>Continuing…</h1><a href="${href}">Continue →</a></main></body></html>`;
+}

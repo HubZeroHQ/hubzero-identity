@@ -11,7 +11,7 @@ import { identityApplicationsCollection, identityCredentialsCollection, identity
 import type { ApplicationDocument } from "@/lib/db/documents";
 import { oidcNodeErrorResponse, staleInteractionMessage } from "@/lib/oidc/error-response";
 import { timed, withRequestTiming, safeServerTiming } from "@/lib/observability/timing";
-import { staleInteractionHtml } from "@/lib/oidc/error-page";
+import { interactionContinueHtml, staleInteractionHtml } from "@/lib/oidc/error-page";
 
 /**
  * Handles only the Node-native OIDC and health surface. It is deliberately
@@ -168,18 +168,26 @@ async function finishInteraction(request: IncomingMessage, response: ServerRespo
   const membership = application ? await identityMembershipsCollection(oidc.runtime.database).findOne({ identitySubject: identity.user.subject, applicationId: application.id, status: "active" }) : null;
   if (!application || !membership) return redirect(response, "/authorize/interaction?denied=1");
   const details = await oidc.provider.interactionDetails(request, response);
-  return completeInteraction(request, response, oidc, details, identity, application);
+  return completeInteraction(request, response, oidc, details, identity, application, "page");
 }
 
-async function completeInteraction(request: IncomingMessage, response: ServerResponse, oidc: OidcProviderRuntime, details: Awaited<ReturnType<OidcProviderRuntime["provider"]["interactionDetails"]>>, identity: NonNullable<Awaited<ReturnType<typeof resolveIdentitySessionToken>>>, application: WithId<ApplicationDocument>) {
+async function completeInteraction(request: IncomingMessage, response: ServerResponse, oidc: OidcProviderRuntime, details: Awaited<ReturnType<OidcProviderRuntime["provider"]["interactionDetails"]>>, identity: NonNullable<Awaited<ReturnType<typeof resolveIdentitySessionToken>>>, application: WithId<ApplicationDocument>, delivery: "redirect" | "page" = "redirect") {
   const grant = new oidc.provider.Grant({ accountId: identity.user.subject, clientId: application.clientId });
   grant.addOIDCScope(typeof details.params.scope === "string" ? details.params.scope : "openid");
   const grantId = await grant.save();
   await oidc.runtime.events.append("oidc.authorization_succeeded", { clientId: application.clientId, prompt: "first_party" }, { targetSubject: identity.user.subject, applicationId: application.id });
-  await oidc.provider.interactionFinished(request, response, {
+  const result = {
     login: { accountId: identity.user.subject, acr: "urn:hubzero:pwd", amr: ["pwd"], ts: Math.floor(identity.authenticatedAt.getTime() / 1000) },
     consent: { grantId },
-  }, { mergeWithLastSubmission: false });
+  };
+  if (delivery === "redirect") return oidc.provider.interactionFinished(request, response, result, { mergeWithLastSubmission: false });
+  // `form-action 'self'` also covers a form's redirects, so a form POST cannot
+  // redirect to the relying party's callback. This page ends the form navigation.
+  const returnTo = await oidc.provider.interactionResult(request, response, result, { mergeWithLastSubmission: false });
+  response.statusCode = 200;
+  response.setHeader("Content-Type", "text/html; charset=utf-8");
+  response.setHeader("Cache-Control", "no-store");
+  response.end(interactionContinueHtml(returnTo));
 }
 
 function applyProviderSecurityHeaders(response: ServerResponse) {

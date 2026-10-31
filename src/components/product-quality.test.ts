@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { staleInteractionHtml } from "@/lib/oidc/error-page";
+import { interactionContinueHtml, staleInteractionHtml } from "@/lib/oidc/error-page";
 
 describe("production product surfaces", () => {
   it("uses the canonical mark without drawing a replacement", () => {
@@ -19,6 +19,12 @@ describe("production product surfaces", () => {
     expect(staleInteractionHtml).toContain('href="https://hubzero.in/studio/login"');
     expect(staleInteractionHtml).not.toMatch(/<script|sessionId|interactionUid|token=/);
     expect(staleInteractionHtml.match(/<h1>/g)).toHaveLength(1);
+  });
+  it("continues an interaction without scripts or unescaped values", () => {
+    const html = interactionContinueHtml('https://auth.hubzero.in/resume/a?b=1&c="><script>');
+    expect(html).toContain('content="0;url=https://auth.hubzero.in/resume/a?b=1&amp;c=&quot;&gt;&lt;script&gt;"');
+    expect(html).not.toMatch(/<script/);
+    expect(html.match(/<h1>/g)).toHaveLength(1);
   });
   it("describes Studio as a product instead of exposing client-registration copy", () => {
     const applications = readFileSync("src/app/applications/page.tsx", "utf8");
