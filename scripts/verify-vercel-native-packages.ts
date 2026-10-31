@@ -26,7 +26,8 @@ for (const route of credentialTraces) {
   for (const expected of expectedRuntimeFiles) {
     if (!files.some((file) => file.endsWith(expected))) throw new Error(`Missing native password runtime file ${expected} from ${route}`);
   }
-  const traced = files.filter((file) => file.endsWith(".node")).map((file) => resolve(dirname(path), file));
+  // Traces list every prebuild the packages ship; only the target's can load.
+  const traced = files.filter((file) => file.endsWith(".node") && file.includes(`/prebuilds/${targetName}/`)).map((file) => resolve(dirname(path), file));
   assertNativeModules(traced, route);
 }
 
